@@ -25,8 +25,8 @@ class AuthService {
 
     // Insert user (default unverified state can be completed by onboarding / OTP flow)
     const result = await db.run(
-      `INSERT INTO users (username, phone, password_hash, display_name, avatar_url, is_online, last_seen, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (username, phone, password_hash, display_name, avatar_url, is_online, last_seen, created_at, updated_at, about)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         sanitizedUsername,
         sanitizedPhone,
@@ -36,7 +36,8 @@ class AuthService {
         0,
         now,
         now,
-        now
+        now,
+        'Hey there! I am using Nexa Whispers.'
       ]
     );
 
@@ -74,7 +75,8 @@ class AuthService {
         display_name: user.display_name,
         avatar_url: user.avatar_url,
         is_online: user.is_online,
-        last_seen: user.last_seen
+        last_seen: user.last_seen,
+        about: user.about
       }
     };
   }

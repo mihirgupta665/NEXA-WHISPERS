@@ -7,6 +7,7 @@ import MessageBubble from '../chat/MessageBubble.jsx';
 import MessageComposer from '../chat/MessageComposer.jsx';
 import { Timer, Phone, Video, ArrowDown, ShieldAlert, ArrowLeft, X, Search, Info, MoreVertical, Pin } from 'lucide-react';
 import { toast } from 'react-toastify';
+import DetailsSidebar from './DetailsSidebar.jsx';
 
 export default function ChatArea() {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ export default function ChatArea() {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(0);
+  const [showDetailsSidebar, setShowDetailsSidebar] = useState(false);
 
   const formatCountdown = (totalSeconds) => {
     const hrs = Math.floor(totalSeconds / 3600);
@@ -86,6 +88,7 @@ export default function ChatArea() {
     setIsSearchActive(false);
     setChatSearchQuery('');
     setHasNewMessages(false);
+    setShowDetailsSidebar(false);
     prevMessagesLength.current = messages.length;
   }, [activeConversation?.id]);
 
@@ -575,7 +578,8 @@ export default function ChatArea() {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
+      <div style={styles.container}>
       {/* Active Conversation Header */}
       <div style={styles.header}>
         {isSearchActive ? (
@@ -600,8 +604,8 @@ export default function ChatArea() {
             </button>
           </div>
         ) : (
-          <div style={styles.chatInfo}>
-            <button onClick={() => selectConversation(null)} style={styles.backButton} className="mobile-only" title="Back" aria-label="Back">
+          <div style={{ ...styles.chatInfo, cursor: 'pointer' }} onClick={() => setShowDetailsSidebar(prev => !prev)}>
+            <button onClick={(e) => { e.stopPropagation(); selectConversation(null); }} style={styles.backButton} className="mobile-only" title="Back" aria-label="Back">
               <ArrowLeft size={20} />
             </button>
             <img src={activeConversation.avatar_url} alt={activeConversation.name} style={styles.avatar} />
@@ -829,6 +833,10 @@ export default function ChatArea() {
         onSend={handleSend}
         conversationId={activeConversation.id}
       />
+    </div>
+      {showDetailsSidebar && (
+        <DetailsSidebar onClose={() => setShowDetailsSidebar(false)} />
+      )}
     </div>
   );
 }

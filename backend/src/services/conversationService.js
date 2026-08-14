@@ -26,7 +26,7 @@ class ConversationService {
 
     // 2. Fetch members for all conversations in a single batch query
     const allMembers = await db.all(
-      `SELECT cm.conversation_id, u.id, u.username, u.display_name, u.avatar_url, u.is_online, u.last_seen, cm.role
+      `SELECT cm.conversation_id, u.id, u.username, u.phone, u.display_name, u.avatar_url, u.is_online, u.last_seen, cm.role
        FROM conversation_members cm
        JOIN users u ON cm.user_id = u.id
        WHERE cm.conversation_id IN (${placeholders})`,
@@ -150,7 +150,7 @@ class ConversationService {
     await this.checkMembership(conversationId, userId);
 
     const members = await db.all(
-      `SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online, u.last_seen, cm.role
+      `SELECT u.id, u.username, u.phone, u.display_name, u.avatar_url, u.is_online, u.last_seen, cm.role
        FROM conversation_members cm
        JOIN users u ON cm.user_id = u.id
        WHERE cm.conversation_id = ?`,

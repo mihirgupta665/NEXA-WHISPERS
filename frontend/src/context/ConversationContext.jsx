@@ -284,6 +284,50 @@ export function ConversationProvider({ children }) {
       });
     });
 
+    // Listen for group member added
+    socket.on('group:member-added', ({ conversation, targetUserId }) => {
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conversation.id ? conversation : c))
+      );
+      const activeConv = activeConversationRef.current;
+      if (activeConv && activeConv.id === conversation.id) {
+        setActiveConversation(conversation);
+      }
+    });
+
+    // Listen for group member removed
+    socket.on('group:member-removed', ({ conversationId, targetUserId }) => {
+      const activeConv = activeConversationRef.current;
+      if (activeConv && activeConv.id === conversationId) {
+        if (targetUserId === user.id) {
+          toast.warn('You have been removed from this group.');
+          setActiveConversation(null);
+        } else {
+          setActiveConversation((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              members: prev.members.filter((m) => m.id !== targetUserId)
+            };
+          });
+        }
+      }
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id === conversationId) {
+            return {
+              ...c,
+              members: c.members.filter((m) => m.id !== targetUserId)
+            };
+          }
+          return c;
+        })
+      );
+      if (targetUserId === user.id) {
+        fetchConversations();
+      }
+    });
+
     // Listen for disappearing timer updates
     socket.on('conversation:disappearing-timer', ({ conversationId, disappearing_timer, disappearing_timer_started_at }) => {
       setConversations((prev) =>
@@ -324,6 +368,8 @@ export function ConversationProvider({ children }) {
       socket.off('user:online');
       socket.off('user:offline');
       socket.off('conversation:created');
+      socket.off('group:member-added');
+      socket.off('group:member-removed');
       socket.off('conversation:disappearing-timer');
       socket.off('conversation:pinned-message');
     };

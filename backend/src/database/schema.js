@@ -144,6 +144,32 @@ export async function initSchema() {
       )
     `);
 
+    // 11. Blocks Table (Real Block)
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS blocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        blocker_id INTEGER NOT NULL,
+        blocked_id INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(blocker_id, blocked_id)
+      )
+    `);
+
+    // 12. Reports Table (Simulation)
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reporter_id INTEGER NOT NULL,
+        reported_id INTEGER NOT NULL,
+        reason TEXT,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (reported_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     // 10. Optimization Indexes
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);`);
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone);`);
@@ -196,6 +222,13 @@ export async function initSchema() {
     try {
       await db.run('ALTER TABLE attachments ADD COLUMN file_data BLOB');
       console.log('[Database] Migration: Added file_data column to attachments table.');
+    } catch (e) {
+      // Column might already exist
+    }
+
+    try {
+      await db.run("ALTER TABLE users ADD COLUMN about TEXT DEFAULT 'Hey there! I am using Nexa Whispers.'");
+      console.log('[Database] Migration: Added about column to users table.');
     } catch (e) {
       // Column might already exist
     }

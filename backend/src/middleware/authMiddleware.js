@@ -29,7 +29,7 @@ export default async function authMiddleware(req, res, next) {
 
     // Load active user metadata from the database
     const user = await db.get(
-      'SELECT id, username, phone, display_name, avatar_url, is_online, last_seen FROM users WHERE id = ?',
+      'SELECT id, username, phone, display_name, avatar_url, is_online, last_seen, about FROM users WHERE id = ?',
       [decoded.id]
     );
 

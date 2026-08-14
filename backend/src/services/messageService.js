@@ -157,6 +157,29 @@ class MessageService {
     // 1. Authorize membership
     await conversationService.checkMembership(conversationId, senderId);
 
+    // Block check for direct conversations
+    const conversationType = await db.get('SELECT type FROM conversations WHERE id = ?', [conversationId]);
+    if (conversationType && conversationType.type === 'direct') {
+      const otherMember = await db.get(
+        'SELECT user_id FROM conversation_members WHERE conversation_id = ? AND user_id != ?',
+        [conversationId, senderId]
+      );
+      if (otherMember) {
+        const recipientId = otherMember.user_id;
+        const blockExists = await db.get(
+          'SELECT id, blocker_id FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)',
+          [senderId, recipientId, recipientId, senderId]
+        );
+        if (blockExists) {
+          if (blockExists.blocker_id === senderId) {
+            throw new ForbiddenError('You have blocked this user. Unblock to send a message.');
+          } else {
+            throw new ForbiddenError('You cannot send messages to this user.');
+          }
+        }
+      }
+    }
+
     // 2. Idempotency Check: check if clientMsgId already exists
     const existing = await db.get('SELECT id FROM messages WHERE client_msg_id = ?', [clientMsgId]);
     if (existing) {

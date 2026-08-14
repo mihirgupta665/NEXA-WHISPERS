@@ -27,6 +27,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [displayName, setDisplayName] = useState(user?.display_name || '');
   const [username, setUsername] = useState(user?.username || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
+  const [about, setAbout] = useState(user?.about || '');
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Privacy Config (Disappearing messages default duration in seconds)
@@ -43,7 +44,8 @@ export default function SettingsModal({ isOpen, onClose }) {
       const res = await updateProfile({
         display_name: displayName,
         username,
-        avatar_url: avatarUrl
+        avatar_url: avatarUrl,
+        about
       });
       if (res.success) {
         toast.success('Profile updated successfully!');
@@ -169,6 +171,16 @@ export default function SettingsModal({ isOpen, onClose }) {
                     value={avatarUrl}
                     onChange={e => setAvatarUrl(e.target.value)}
                     style={styles.input}
+                  />
+                </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>About</label>
+                  <textarea
+                    value={about}
+                    onChange={e => setAbout(e.target.value)}
+                    style={{ ...styles.input, minHeight: '60px', resize: 'vertical' }}
+                    maxLength={150}
                   />
                 </div>
 

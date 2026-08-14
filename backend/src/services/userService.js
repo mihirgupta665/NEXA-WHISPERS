@@ -4,7 +4,7 @@ import { ConflictError, NotFoundError } from '../middleware/errorHandler.js';
 class UserService {
   async getUserById(id) {
     const user = await db.get(
-      'SELECT id, username, phone, display_name, avatar_url, is_online, last_seen, created_at FROM users WHERE id = ?',
+      'SELECT id, username, phone, display_name, avatar_url, is_online, last_seen, created_at, about FROM users WHERE id = ?',
       [id]
     );
     if (!user) {
@@ -13,7 +13,7 @@ class UserService {
     return user;
   }
 
-  async updateProfile(id, { display_name, username, phone, avatar_url }) {
+  async updateProfile(id, { display_name, username, phone, avatar_url, about }) {
     const currentUser = await this.getUserById(id);
     const updates = [];
     const params = [];
@@ -52,6 +52,11 @@ class UserService {
       params.push(avatar_url);
     }
 
+    if (about !== undefined) {
+      updates.push('about = ?');
+      params.push(about.trim());
+    }
+
     if (updates.length === 0) {
       return currentUser;
     }
@@ -77,6 +82,41 @@ class UserService {
        LIMIT 20`,
       [currentUserId, term, term, term]
     );
+  }
+
+  async blockUser(blockerId, blockedId) {
+    if (blockerId === blockedId) {
+      throw new ValidationError('You cannot block yourself.');
+    }
+    const targetUser = await db.get('SELECT id FROM users WHERE id = ?', [blockedId]);
+    if (!targetUser) {
+      throw new NotFoundError('User to block not found.');
+    }
+    await db.run(
+      'INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)',
+      [blockerId, blockedId, Date.now()]
+    );
+    return { success: true };
+  }
+
+  async unblockUser(blockerId, blockedId) {
+    await db.run(
+      'DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?',
+      [blockerId, blockedId]
+    );
+    return { success: true };
+  }
+
+  async reportUser(reporterId, reportedId, reason) {
+    const targetUser = await db.get('SELECT id FROM users WHERE id = ?', [reportedId]);
+    if (!targetUser) {
+      throw new NotFoundError('User to report not found.');
+    }
+    await db.run(
+      'INSERT INTO reports (reporter_id, reported_id, reason, created_at) VALUES (?, ?, ?, ?)',
+      [reporterId, reportedId, reason || null, Date.now()]
+    );
+    return { success: true };
   }
 }
 
