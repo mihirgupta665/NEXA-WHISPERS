@@ -607,7 +607,7 @@ export default function ChatArea() {
       >
         <div style={styles.e2eBanner}>
           <ShieldAlert size={14} color="var(--primary)" />
-          <span>Simulated Encryption Active. All discussions stored securely in local SQLite files.</span>
+          <span>Simulated Encryption Active. All discussions stored securely in Turso Cloud Database.</span>
         </div>
 
         {messagesLoading ? (
