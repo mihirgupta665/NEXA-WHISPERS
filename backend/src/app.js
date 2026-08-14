@@ -9,6 +9,7 @@ import userRoutes from './routes/userRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import conversationRoutes from './routes/conversationRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+import storyRoutes from './routes/storyRoutes.js';
 
 import errorHandler, { NotFoundError } from './middleware/errorHandler.js';
 
@@ -45,6 +46,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/stories', storyRoutes);
 
 // Fallback 404 handler
 app.use((req, res, next) => {

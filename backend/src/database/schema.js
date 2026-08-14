@@ -128,7 +128,20 @@ export async function initSchema() {
       )
     `);
 
-    // 9. Optimization Indexes
+    // 9. Stories Table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS stories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        gradient TEXT,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // 10. Optimization Indexes
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);`);
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone);`);
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_user_contact ON contacts(user_id, contact_user_id);`);
@@ -137,6 +150,7 @@ export async function initSchema() {
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_msg_id);`);
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_msg_user ON message_receipts(message_id, user_id);`);
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_reactions_msg_user ON reactions(message_id, user_id);`);
+    await db.run(`CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);`);
 
     await db.run('COMMIT');
 

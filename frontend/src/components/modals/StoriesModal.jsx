@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Play, Pause, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Play, Pause, Sparkles, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext.jsx';
+import api from '../../services/api.js';
 
 export default function StoriesModal({ isOpen, onClose }) {
+  const { user } = useAuth();
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeStoryIdx, setActiveStoryIdx] = useState(null);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -19,13 +24,36 @@ export default function StoriesModal({ isOpen, onClose }) {
     return () => window.removeEventListener('keydown', handleEscapeKey);
   }, [isOpen, onClose]);
 
-  const stories = [
-    { id: 1, name: 'My Story', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Mihir', gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', text: 'Chilling out at the dev desk 🚀' },
-    { id: 2, name: 'Rahul', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Rahul', gradient: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)', text: 'Vibe check! Signal aesthetics are amazing.' },
-    { id: 3, name: 'Ananya', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Ananya', gradient: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)', text: 'Beautiful day outside today! ☀️' },
-    { id: 4, name: 'Arjun', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Arjun', gradient: 'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)', text: 'Coding all night, sleeping all day.' },
-    { id: 5, name: 'Priya', avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Priya', gradient: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)', text: 'Just baked some fresh chocolate chip cookies!' }
-  ];
+  const fetchStories = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/api/stories');
+      if (res.data.success) {
+        // Map the current logged-in user's story name to 'My Story' if it matches
+        const mappedStories = res.data.data.map(s => {
+          return {
+            id: s.id,
+            user_id: s.user_id,
+            name: s.user_id === user?.id ? 'My Story' : s.name,
+            avatar: s.avatar,
+            gradient: s.gradient,
+            text: s.content
+          };
+        });
+        setStories(mappedStories);
+      }
+    } catch (err) {
+      console.error('[Stories Modal] Failed to fetch active stories:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchStories();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (activeStoryIdx === null || isPaused) return;
@@ -93,35 +121,45 @@ export default function StoriesModal({ isOpen, onClose }) {
             <p style={styles.subtitle}>Updates that disappear after 24 hours.</p>
 
             <div style={styles.circlesRow}>
-              {stories.map((story, idx) => (
-                <div
-                  key={story.id}
-                  tabIndex={0}
-                  aria-label={`View story of ${story.name}`}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleOpenStory(idx);
-                    }
-                  }}
-                  onClick={() => handleOpenStory(idx)}
-                  style={styles.storyCircleWrapper}
-                >
-                  <div style={styles.avatarRing}>
-                    <img src={story.avatar} alt={story.name} style={styles.circleAvatar} />
-                  </div>
-                  <span style={styles.circleName}>{story.name}</span>
+              {loading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '16px 0' }}>
+                  <Loader2 size={24} className="spinner" color="var(--primary)" />
                 </div>
-              ))}
+              ) : stories.length === 0 ? (
+                <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic', padding: '16px 0', width: '100%', textAlign: 'center' }}>
+                  No active stories
+                </div>
+              ) : (
+                stories.map((story, idx) => (
+                  <div
+                    key={story.id}
+                    tabIndex={0}
+                    aria-label={`View story of ${story.name}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOpenStory(idx);
+                      }
+                    }}
+                    onClick={() => handleOpenStory(idx)}
+                    style={styles.storyCircleWrapper}
+                  >
+                    <div style={styles.avatarRing}>
+                      <img src={story.avatar} alt={story.name} style={styles.circleAvatar} />
+                    </div>
+                    <span style={styles.circleName}>{story.name}</span>
+                  </div>
+                ))
+              )}
             </div>
 
             <div style={styles.comingSoonPanel}>
               <Sparkles size={36} color="var(--primary)" />
-              <h4 style={styles.comingSoonTitle}>Stories Experience Coming Soon</h4>
+              <h4 style={styles.comingSoonTitle}>Ephemeral Stories Pipeline Active</h4>
               <p style={styles.comingSoonText}>
-                We are building a highly secure, end-to-end encrypted Stories system so you can share moments with your mutual contacts privately.
+                Active stories are fetched dynamically from the database and automatically expire after 24 hours. The self-healing server boots fresh stories for testing when none exist!
               </p>
-              <span style={styles.badge}>Preview Mode Active</span>
+              <span style={styles.badge}>Live Preview Mode</span>
             </div>
           </div>
         ) : (

@@ -3,11 +3,13 @@ import dotenv from 'dotenv';
 import app from './src/app.js';
 import { initSocketServer } from './src/sockets/socketServer.js';
 import { initSchema } from './src/database/schema.js';
+import storyService from './src/services/storyService.js';
 
 dotenv.config();
 
-// Initialize database schema on startup
+// Initialize database schema and auto-seed stories on startup
 await initSchema();
+await storyService.checkAndSeedStories();
 
 const server = http.createServer(app);
 
