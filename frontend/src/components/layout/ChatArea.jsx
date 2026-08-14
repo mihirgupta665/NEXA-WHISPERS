@@ -363,8 +363,9 @@ export default function ChatArea() {
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
-  const handleCallClick = () => {
-    toast.info('Encrypted calling is a simulated feature. Coming Soon!');
+  const handleCallClick = (isVideo = false) => {
+    const callType = isVideo ? 'video calling' : 'voice calling';
+    toast.info(`Encrypted ${callType} is a simulated feature. Coming Soon!`);
   };
 
   // Render Date Separator line
@@ -650,10 +651,10 @@ export default function ChatArea() {
             </div>
           )}
 
-          <button onClick={handleCallClick} style={styles.headerActionButton} title="Voice Call" aria-label="Voice Call" className="desktop-only hover-action-btn">
+          <button onClick={() => handleCallClick(false)} style={styles.headerActionButton} title="Voice Call" aria-label="Voice Call" className="desktop-only hover-action-btn">
             <Phone size={18} />
           </button>
-          <button onClick={handleCallClick} style={styles.headerActionButton} title="Video Call" aria-label="Video Call" className="desktop-only hover-action-btn">
+          <button onClick={() => handleCallClick(true)} style={styles.headerActionButton} title="Video Call" aria-label="Video Call" className="desktop-only hover-action-btn">
             <Video size={18} />
           </button>
         </div>
