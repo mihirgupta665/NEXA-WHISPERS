@@ -156,25 +156,25 @@ class MessageService {
     } catch (err) {
       try {
         await db.run('ROLLBACK');
-      } catch (rbErr) {}
+      } catch (rbErr) { }
       throw err;
     }
 
     return this.getMessageById(messageId, senderId);
   }
 
-  async addAttachment(messageId, { file_name, file_url, file_type, file_size }) {
+  async addAttachment(messageId, { file_name, file_url, file_data, file_type, file_size }) {
     const now = Date.now();
     await db.run(
-      `INSERT INTO attachments (message_id, file_name, file_url, file_type, file_size, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [messageId, file_name, file_url, file_type, file_size, now]
+      `INSERT INTO attachments (message_id, file_name, file_url, file_data, file_type, file_size, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [messageId, file_name, file_url, file_data || null, file_type, file_size, now]
     );
   }
 
   async markAsRead(conversationId, userId) {
     const now = Date.now();
-    
+
     // Find all message receipts in this conversation for this user that are not yet 'read'
     const unreadReceipts = await db.all(
       `SELECT mr.message_id
@@ -213,7 +213,7 @@ class MessageService {
     } catch (err) {
       try {
         await db.run('ROLLBACK');
-      } catch (rbErr) {}
+      } catch (rbErr) { }
       throw err;
     }
 
@@ -222,7 +222,7 @@ class MessageService {
 
   async markAsDelivered(conversationId, userId) {
     const now = Date.now();
-    
+
     // Find all message receipts in this conversation for this user that are 'sent'
     const undeliveredReceipts = await db.all(
       `SELECT mr.message_id
@@ -260,7 +260,7 @@ class MessageService {
     } catch (err) {
       try {
         await db.run('ROLLBACK');
-      } catch (rbErr) {}
+      } catch (rbErr) { }
       throw err;
     }
 

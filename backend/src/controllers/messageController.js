@@ -26,17 +26,20 @@ class MessageController {
 
       // Save attachment payload details if file is present
       if (req.file) {
-        const fileUrl = `/uploads/${req.file.filename}`;
+        const fileData = req.file.buffer || Buffer.alloc(0);
+        const fileUrl = `data:${req.file.mimetype};base64,${fileData.toString('base64')}`;
+
         await messageService.addAttachment(message.id, {
           file_name: req.file.originalname,
           file_url: fileUrl,
+          file_data: fileData,
           file_type: req.file.mimetype,
           file_size: req.file.size
         });
 
         // Re-load enriched message structure containing the attachment attributes
         const updatedMsg = await messageService.getMessageById(message.id, req.user.id);
-        
+
         const io = req.app.get('io');
         io.to(`conversation_${conversationId}`).emit('message:new', updatedMsg);
 
@@ -63,7 +66,7 @@ class MessageController {
       const messageId = parseInt(req.params.id);
       const { emoji } = req.body;
       const data = await messageService.addReaction(messageId, req.user.id, emoji);
-      
+
       const io = req.app.get('io');
       io.to(`conversation_${data.conversation_id}`).emit('message:reaction', {
         messageId,
@@ -84,7 +87,7 @@ class MessageController {
     try {
       const messageId = parseInt(req.params.id);
       const data = await messageService.removeReaction(messageId, req.user.id);
-      
+
       const io = req.app.get('io');
       io.to(`conversation_${data.conversation_id}`).emit('message:reaction', {
         messageId,

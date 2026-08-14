@@ -120,6 +120,7 @@ export async function initSchema() {
         message_id INTEGER NOT NULL,
         file_name TEXT NOT NULL,
         file_url TEXT NOT NULL,
+        file_data BLOB,
         file_type TEXT NOT NULL,
         file_size INTEGER NOT NULL,
         created_at INTEGER NOT NULL,
@@ -138,7 +139,7 @@ export async function initSchema() {
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_reactions_msg_user ON reactions(message_id, user_id);`);
 
     await db.run('COMMIT');
-    
+
     // Migration helper for pre-existing databases
     try {
       await db.run('ALTER TABLE conversations ADD COLUMN disappearing_timer INTEGER DEFAULT 0');
@@ -146,6 +147,14 @@ export async function initSchema() {
     } catch (e) {
       // Column might already exist
     }
+
+    try {
+      await db.run('ALTER TABLE attachments ADD COLUMN file_data BLOB');
+      console.log('[Database] Migration: Added file_data column to attachments table.');
+    } catch (e) {
+      // Column might already exist
+    }
+
     console.log('[Database] Database schema initialized successfully.');
   } catch (err) {
     try {

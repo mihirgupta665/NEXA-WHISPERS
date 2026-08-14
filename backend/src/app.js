@@ -33,12 +33,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cookieParser());
 
-// Serve file uploads securely
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+// File uploads are persisted in SQLite, so no filesystem upload directory is required.
 
 // Mount API routes
 app.use('/api/auth', authRoutes);

@@ -97,7 +97,7 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
   // Render the message ticks
   const renderStatus = () => {
     if (!isMe) return null;
-    
+
     switch (message.status) {
       case 'sending':
         return <span style={styles.sendingIndicator}>...</span>;
@@ -132,21 +132,21 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
   // Group message reactions
   const groupedReactions = message.reactions
     ? message.reactions.reduce((acc, current) => {
-        if (!acc[current.emoji]) {
-          acc[current.emoji] = {
-            emoji: current.emoji,
-            count: 0,
-            usernames: [],
-            hasReacted: false
-          };
-        }
-        acc[current.emoji].count += 1;
-        acc[current.emoji].usernames.push(current.username);
-        if (current.user_id === user.id) {
-          acc[current.emoji].hasReacted = true;
-        }
-        return acc;
-      }, {})
+      if (!acc[current.emoji]) {
+        acc[current.emoji] = {
+          emoji: current.emoji,
+          count: 0,
+          usernames: [],
+          hasReacted: false
+        };
+      }
+      acc[current.emoji].count += 1;
+      acc[current.emoji].usernames.push(current.username);
+      if (current.user_id === user.id) {
+        acc[current.emoji].hasReacted = true;
+      }
+      return acc;
+    }, {})
     : {};
 
   const handleContextMenuEvent = (e) => {
@@ -160,7 +160,7 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
     const touch = e.touches[0];
     const clientX = touch.clientX;
     const clientY = touch.clientY;
-    
+
     touchTimer.current = setTimeout(() => {
       setIsActionMenuOpen(true);
       setShowHoverActions(true);
@@ -362,38 +362,44 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
         {message.message_type === 'attachment' && (
           <div style={styles.attachmentContainer}>
             {message.attachment ? (
-              message.attachment.file_type.startsWith('image/') ? (
-                <img
-                  src={`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${message.attachment.file_url}`}
-                  alt={message.attachment.file_name}
-                  style={styles.attachmentImage}
-                />
-              ) : (
-                <div style={styles.fileCard}>
-                  <FileText size={24} color="var(--primary)" />
-                  <div style={styles.fileCardMeta}>
-                    <span style={styles.fileName}>{message.attachment.file_name}</span>
-                    <span style={styles.fileSize}>{formatFileSize(message.attachment.file_size)}</span>
+              (() => {
+                const attachmentUrl = message.attachment.file_url?.startsWith('data:')
+                  ? message.attachment.file_url
+                  : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${message.attachment.file_url}`;
+
+                return message.attachment.file_type.startsWith('image/') ? (
+                  <img
+                    src={attachmentUrl}
+                    alt={message.attachment.file_name}
+                    style={styles.attachmentImage}
+                  />
+                ) : (
+                  <div style={styles.fileCard}>
+                    <FileText size={24} color="var(--primary)" />
+                    <div style={styles.fileCardMeta}>
+                      <span style={styles.fileName}>{message.attachment.file_name}</span>
+                      <span style={styles.fileSize}>{formatFileSize(message.attachment.file_size)}</span>
+                    </div>
+                    <a
+                      href={attachmentUrl}
+                      download={message.attachment.file_name}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={styles.downloadButton}
+                    >
+                      <Download size={16} />
+                    </a>
                   </div>
-                  <a
-                    href={`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${message.attachment.file_url}`}
-                    download={message.attachment.file_name}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={styles.downloadButton}
-                  >
-                    <Download size={16} />
-                  </a>
-                </div>
-              )
+                );
+              })()
             ) : (
               <div style={styles.fileCard}>
                 <FileText size={24} color="var(--text-muted)" />
                 <div style={styles.fileCardMeta}>
                   <span style={styles.fileName}>{message.content}</span>
                   <span style={styles.fileSize}>
-                    {message.uploadProgress !== undefined 
-                      ? `Uploading: ${message.uploadProgress}%` 
+                    {message.uploadProgress !== undefined
+                      ? `Uploading: ${message.uploadProgress}%`
                       : 'Uploading...'}
                   </span>
                 </div>
