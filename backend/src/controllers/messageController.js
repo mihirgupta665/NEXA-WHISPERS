@@ -133,7 +133,7 @@ class MessageController {
       }
       
       res.setHeader('Content-Type', attachment.file_type);
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(attachment.file_name)}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(attachment.file_name)}"`);
       res.send(data);
     } catch (err) {
       next(err);
