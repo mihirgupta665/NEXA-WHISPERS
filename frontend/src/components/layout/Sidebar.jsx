@@ -3,7 +3,8 @@ import { useConversations } from '../../context/ConversationContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSocket } from '../../context/SocketContext.jsx';
 import api from '../../services/api.js';
-import { Search, MessageSquarePlus, Settings, WifiOff, Shield, CircleDot, X, Loader2 } from 'lucide-react';
+import { Search, MessageSquarePlus, Settings, WifiOff, Shield, CircleDot, X, Loader2, Phone } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 export default function Sidebar({ onOpenNewChat, onOpenSettings, onOpenStories }) {
   const { user } = useAuth();
@@ -153,6 +154,9 @@ export default function Sidebar({ onOpenNewChat, onOpenSettings, onOpenStories }
           </button>
           <button onClick={onOpenNewChat} title="New Chat" aria-label="New Chat" style={styles.actionButton} className="hover-action-btn">
             <MessageSquarePlus size={20} />
+          </button>
+          <button onClick={() => toast.info('Voice & Video Calling coming soon!')} title="Calls" aria-label="Calls" style={styles.actionButton} className="hover-action-btn">
+            <Phone size={18} />
           </button>
           <button onClick={onOpenSettings} title="Settings" aria-label="Settings" style={styles.actionButton} className="hover-action-btn">
             <Settings size={20} />
