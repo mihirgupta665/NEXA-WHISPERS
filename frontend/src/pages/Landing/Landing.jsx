@@ -49,7 +49,7 @@ export default function Landing() {
       </main>
 
       <footer style={styles.footer}>
-        <span>&copy; {new Date().getFullYear()} Nexa Whispers. All rights reserved. Private demo build.</span>
+        <span>Nexa Whispers | Made by ❣️Mihir Gupta | &copy; {new Date().getFullYear()} All rights reserved.</span>
       </footer>
     </div>
   );
