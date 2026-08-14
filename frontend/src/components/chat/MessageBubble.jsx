@@ -308,7 +308,8 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
       style={{
         ...styles.wrapper,
         justifyContent: isMe ? 'flex-end' : 'flex-start',
-        marginTop
+        marginTop,
+        zIndex: isActionMenuOpen ? 50 : undefined
       }}
     >
       {/* Message Bubble Card */}
