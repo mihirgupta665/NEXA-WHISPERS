@@ -1,0 +1,13 @@
+# Backend node modules
+node_modules/
+
+# Local credentials / environment configurations
+.env
+
+# SQLite local database files
+database/*.db
+database/*.db-journal
+
+# File attachments uploads folder
+uploads/*
+!uploads/.gitkeep

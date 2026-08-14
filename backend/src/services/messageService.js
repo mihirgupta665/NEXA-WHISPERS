@@ -1,0 +1,339 @@
+import db from '../database/connection.js';
+import conversationService from './conversationService.js';
+import { ForbiddenError, NotFoundError } from '../middleware/errorHandler.js';
+
+class MessageService {
+  async getMessages(conversationId, userId, limit = 100, offset = 0) {
+    // 1. Authorize membership
+    await conversationService.checkMembership(conversationId, userId);
+
+    const now = Date.now();
+
+    // 2. Perform lazy cleanup of expired disappearing messages
+    await db.run('DELETE FROM messages WHERE expires_at IS NOT NULL AND expires_at < ?', [now]);
+
+    // 3. Fetch messages (paginated)
+    const messages = await db.all(
+      `SELECT m.*, u.display_name as sender_name, u.avatar_url as sender_avatar
+       FROM messages m
+       LEFT JOIN users u ON m.sender_id = u.id
+       WHERE m.conversation_id = ?
+       ORDER BY m.created_at ASC
+       LIMIT ? OFFSET ?`,
+      [conversationId, limit, offset]
+    );
+
+    const enrichedMessages = [];
+
+    for (const msg of messages) {
+      if (msg.sender_id === 0) {
+        msg.sender_name = 'System';
+      }
+      // Fetch reactions
+      const reactions = await db.all(
+        `SELECT r.id, r.user_id, r.emoji, u.display_name as username 
+         FROM reactions r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.message_id = ?`,
+        [msg.id]
+      );
+
+      // Fetch attachment if any
+      const attachment = await db.get('SELECT * FROM attachments WHERE message_id = ?', [msg.id]);
+
+      // Fetch receipts (for status verification)
+      const receipts = await db.all(
+        `SELECT mr.user_id, mr.status, mr.delivered_at, mr.read_at, u.display_name
+         FROM message_receipts mr
+         JOIN users u ON mr.user_id = u.id
+         WHERE mr.message_id = ?`,
+        [msg.id]
+      );
+
+      enrichedMessages.push({
+        ...msg,
+        reactions,
+        attachment: attachment || null,
+        receipts
+      });
+    }
+
+    return enrichedMessages;
+  }
+
+  async getMessageById(messageId, userId) {
+    const msg = await db.get(
+      `SELECT m.*, u.display_name as sender_name, u.avatar_url as sender_avatar
+       FROM messages m
+       LEFT JOIN users u ON m.sender_id = u.id
+       WHERE m.id = ?`,
+      [messageId]
+    );
+    if (!msg) {
+      throw new NotFoundError('Message not found.');
+    }
+    if (msg.sender_id === 0) {
+      msg.sender_name = 'System';
+    }
+
+    await conversationService.checkMembership(msg.conversation_id, userId);
+
+    const reactions = await db.all(
+      `SELECT r.id, r.user_id, r.emoji, u.display_name as username 
+       FROM reactions r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.message_id = ?`,
+      [msg.id]
+    );
+
+    const attachment = await db.get('SELECT * FROM attachments WHERE message_id = ?', [msg.id]);
+
+    const receipts = await db.all(
+      `SELECT mr.user_id, mr.status, mr.delivered_at, mr.read_at, u.display_name
+       FROM message_receipts mr
+       JOIN users u ON mr.user_id = u.id
+       WHERE mr.message_id = ?`,
+      [msg.id]
+    );
+
+    return {
+      ...msg,
+      reactions,
+      attachment: attachment || null,
+      receipts
+    };
+  }
+
+  async sendMessage(senderId, conversationId, { content, clientMsgId, message_type = 'text', expires_at = null, reply_to_message_id = null }) {
+    // 1. Authorize membership
+    await conversationService.checkMembership(conversationId, senderId);
+
+    // 2. Idempotency Check: check if clientMsgId already exists
+    const existing = await db.get('SELECT id FROM messages WHERE client_msg_id = ?', [clientMsgId]);
+    if (existing) {
+      console.log(`[Message Service] Duplicate message detected for clientMsgId: ${clientMsgId}. Reusing.`);
+      return this.getMessageById(existing.id, senderId);
+    }
+
+    // 3. Get all other members of the conversation to seed receipts
+    const members = await db.all('SELECT user_id FROM conversation_members WHERE conversation_id = ?', [conversationId]);
+    const otherMembers = members.filter(m => m.user_id !== senderId);
+
+    const now = Date.now();
+    let messageId;
+
+    // Check conversation-level disappearing message settings
+    const conv = await db.get('SELECT disappearing_timer FROM conversations WHERE id = ?', [conversationId]);
+    const timer = conv ? conv.disappearing_timer : 0;
+    let expiresAt = expires_at;
+    if (timer > 0) {
+      expiresAt = now + (timer * 1000);
+    }
+
+    await db.run('BEGIN TRANSACTION');
+    try {
+      // Insert message
+      const result = await db.run(
+        `INSERT INTO messages (conversation_id, sender_id, content, message_type, status, reply_to_message_id, expires_at, client_msg_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [conversationId, senderId, content, message_type, 'sent', reply_to_message_id, expiresAt, clientMsgId, now, now]
+      );
+      messageId = result.lastID;
+
+      // Seed receipts for other members
+      for (const member of otherMembers) {
+        await db.run(
+          `INSERT INTO message_receipts (message_id, user_id, status, delivered_at, read_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [messageId, member.user_id, 'sent', null, null]
+        );
+      }
+
+      // Update conversation timestamp
+      await db.run('UPDATE conversations SET updated_at = ? WHERE id = ?', [now, conversationId]);
+
+      await db.run('COMMIT');
+    } catch (err) {
+      try {
+        await db.run('ROLLBACK');
+      } catch (rbErr) {}
+      throw err;
+    }
+
+    return this.getMessageById(messageId, senderId);
+  }
+
+  async addAttachment(messageId, { file_name, file_url, file_type, file_size }) {
+    const now = Date.now();
+    await db.run(
+      `INSERT INTO attachments (message_id, file_name, file_url, file_type, file_size, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [messageId, file_name, file_url, file_type, file_size, now]
+    );
+  }
+
+  async markAsRead(conversationId, userId) {
+    const now = Date.now();
+    
+    // Find all message receipts in this conversation for this user that are not yet 'read'
+    const unreadReceipts = await db.all(
+      `SELECT mr.message_id
+       FROM message_receipts mr
+       JOIN messages m ON mr.message_id = m.id
+       WHERE m.conversation_id = ? AND mr.user_id = ? AND mr.status != 'read'`,
+      [conversationId, userId]
+    );
+
+    if (unreadReceipts.length === 0) {
+      return [];
+    }
+
+    const messageIds = unreadReceipts.map(r => r.message_id);
+
+    await db.run('BEGIN TRANSACTION');
+    try {
+      // Update receipts
+      await db.run(
+        `UPDATE message_receipts 
+         SET status = 'read', read_at = ? 
+         WHERE user_id = ? AND message_id IN (${messageIds.map(() => '?').join(',')})`,
+        [now, userId, ...messageIds]
+      );
+
+      // If all recipients have read, or for direct chats, sync message overall status if needed
+      // (For simple direct messaging, we update messages.status to 'read' if recipient read it)
+      await db.run(
+        `UPDATE messages
+         SET status = 'read', updated_at = ?
+         WHERE id IN (${messageIds.map(() => '?').join(',')})`,
+        [now, ...messageIds]
+      );
+
+      await db.run('COMMIT');
+    } catch (err) {
+      try {
+        await db.run('ROLLBACK');
+      } catch (rbErr) {}
+      throw err;
+    }
+
+    return messageIds;
+  }
+
+  async markAsDelivered(conversationId, userId) {
+    const now = Date.now();
+    
+    // Find all message receipts in this conversation for this user that are 'sent'
+    const undeliveredReceipts = await db.all(
+      `SELECT mr.message_id
+       FROM message_receipts mr
+       JOIN messages m ON mr.message_id = m.id
+       WHERE m.conversation_id = ? AND mr.user_id = ? AND mr.status = 'sent'`,
+      [conversationId, userId]
+    );
+
+    if (undeliveredReceipts.length === 0) {
+      return [];
+    }
+
+    const messageIds = undeliveredReceipts.map(r => r.message_id);
+
+    await db.run('BEGIN TRANSACTION');
+    try {
+      // Update receipts
+      await db.run(
+        `UPDATE message_receipts 
+         SET status = 'delivered', delivered_at = ? 
+         WHERE user_id = ? AND message_id IN (${messageIds.map(() => '?').join(',')})`,
+        [now, userId, ...messageIds]
+      );
+
+      // Sync message overall status
+      await db.run(
+        `UPDATE messages
+         SET status = 'delivered', updated_at = ?
+         WHERE id IN (${messageIds.map(() => '?').join(',')})`,
+        [now, ...messageIds]
+      );
+
+      await db.run('COMMIT');
+    } catch (err) {
+      try {
+        await db.run('ROLLBACK');
+      } catch (rbErr) {}
+      throw err;
+    }
+
+    return messageIds;
+  }
+
+  async addReaction(messageId, userId, emoji) {
+    const msg = await db.get('SELECT conversation_id FROM messages WHERE id = ?', [messageId]);
+    if (!msg) {
+      throw new NotFoundError('Message not found.');
+    }
+
+    await conversationService.checkMembership(msg.conversation_id, userId);
+
+    const now = Date.now();
+    // Insert or replace reaction
+    await db.run(
+      `INSERT INTO reactions (message_id, user_id, emoji, created_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(message_id, user_id) DO UPDATE SET emoji = ?, created_at = ?`,
+      [messageId, userId, emoji, now, emoji, now]
+    );
+
+    return this.getMessageById(messageId, userId);
+  }
+
+  async removeReaction(messageId, userId) {
+    await db.run(
+      'DELETE FROM reactions WHERE message_id = ? AND user_id = ?',
+      [messageId, userId]
+    );
+    return this.getMessageById(messageId, userId);
+  }
+
+  async searchMessages(userId, queryStr) {
+    if (!queryStr.trim()) return [];
+    const term = `%${queryStr.trim()}%`;
+    const now = Date.now();
+
+    const messages = await db.all(
+      `SELECT m.*, u.display_name as sender_name, u.avatar_url as sender_avatar, 
+              c.type as conversation_type, c.name as conversation_name
+       FROM messages m
+       JOIN conversation_members cm ON m.conversation_id = cm.conversation_id
+       LEFT JOIN users u ON m.sender_id = u.id
+       LEFT JOIN conversations c ON m.conversation_id = c.id
+       WHERE cm.user_id = ? 
+         AND m.content LIKE ? 
+         AND m.message_type = 'text'
+         AND (m.expires_at IS NULL OR m.expires_at > ?)
+       ORDER BY m.created_at DESC
+       LIMIT 50`,
+      [userId, term, now]
+    );
+
+    for (const msg of messages) {
+      if (msg.sender_id === 0) {
+        msg.sender_name = 'System';
+      }
+      if (msg.conversation_type === 'direct') {
+        const otherMember = await db.get(
+          `SELECT u.display_name 
+           FROM conversation_members cm
+           JOIN users u ON cm.user_id = u.id
+           WHERE cm.conversation_id = ? AND cm.user_id != ?`,
+          [msg.conversation_id, userId]
+        );
+        msg.conversation_name = otherMember ? otherMember.display_name : 'Direct Chat';
+      }
+    }
+
+    return messages;
+  }
+}
+
+export default new MessageService();
