@@ -38,19 +38,10 @@ class AuthController {
 
   async login(req, res, next) {
     try {
-      const { token, user } = await authService.login(req.body);
-
-      // Set cookie configuration parameters
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-      });
-
+      const { phone } = await authService.login(req.body);
       res.status(200).json({
         success: true,
-        data: { user, token }
+        data: { phone }
       });
     } catch (err) {
       next(err);

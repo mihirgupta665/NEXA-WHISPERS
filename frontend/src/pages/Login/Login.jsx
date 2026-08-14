@@ -23,8 +23,8 @@ export default function Login() {
     try {
       const res = await login(username, password);
       if (res.success) {
-        toast.success(`Welcome back, ${res.data.user.display_name}!`);
-        navigate('/chat');
+        toast.success('Credentials verified. Proceeding to OTP verification.');
+        navigate('/otp', { state: { phone: res.data.phone } });
       } else {
         toast.error(res.error || 'Invalid credentials.');
       }
@@ -34,10 +34,6 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleOtpRedirect = () => {
-    navigate('/otp', { state: { phone: username.trim() } });
   };
 
   return (
@@ -91,17 +87,9 @@ export default function Login() {
             {submitting ? (
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 <Loader2 size={16} className="spinner" />
-                Signing In...
+                Verifying...
               </span>
-            ) : 'Sign In'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleOtpRedirect}
-            style={styles.secondaryButton}
-          >
-            Continue to OTP
+            ) : 'Continue to OTP'}
           </button>
 
           <span style={styles.helpText}>

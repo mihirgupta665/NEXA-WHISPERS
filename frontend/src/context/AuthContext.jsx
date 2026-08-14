@@ -46,9 +46,6 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     const res = await api.post('/api/auth/login', { username, password });
-    if (res.data.success) {
-      setUser(res.data.data.user);
-    }
     return res.data;
   };
 
