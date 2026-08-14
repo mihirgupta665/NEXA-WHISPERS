@@ -9,6 +9,17 @@ class MessageService {
 
     const now = Date.now();
 
+    // Check and disable expired disappearing messages timer
+    const conv = await db.get('SELECT disappearing_timer, disappearing_timer_started_at FROM conversations WHERE id = ?', [conversationId]);
+    if (conv && conv.disappearing_timer > 0 && conv.disappearing_timer_started_at) {
+      if (now >= conv.disappearing_timer_started_at + conv.disappearing_timer * 1000) {
+        await db.run(
+          'UPDATE conversations SET disappearing_timer = 0, disappearing_timer_started_at = NULL, updated_at = ? WHERE id = ?',
+          [now, conversationId]
+        );
+      }
+    }
+
     // 2. Perform lazy cleanup of expired disappearing messages
     await db.run('DELETE FROM messages WHERE expires_at IS NOT NULL AND expires_at < ?', [now]);
 
@@ -124,13 +135,26 @@ class MessageService {
 
     // Check conversation-level disappearing message settings
     const conv = await db.get('SELECT disappearing_timer, disappearing_timer_started_at FROM conversations WHERE id = ?', [conversationId]);
-    const timer = conv ? conv.disappearing_timer : 0;
-    const startedAt = (conv && conv.disappearing_timer_started_at) ? conv.disappearing_timer_started_at : (conv ? conv.updated_at : now);
+    let timer = conv ? conv.disappearing_timer : 0;
+    let startedAt = conv ? conv.disappearing_timer_started_at : null;
     let expiresAt = expires_at;
-    if (timer > 0) {
-      const elapsed = now - startedAt;
-      const windowIndex = Math.floor(elapsed / (timer * 1000));
-      expiresAt = startedAt + (windowIndex + 1) * timer * 1000;
+
+    if (timer > 0 && startedAt) {
+      if (now >= startedAt + timer * 1000) {
+        // Timer has finished! Turn it off in the database
+        await db.run(
+          'UPDATE conversations SET disappearing_timer = 0, disappearing_timer_started_at = NULL, updated_at = ? WHERE id = ?',
+          [now, conversationId]
+        );
+        timer = 0;
+        startedAt = null;
+        expiresAt = null;
+        // Clean up expired messages
+        await db.run('DELETE FROM messages WHERE expires_at IS NOT NULL AND expires_at < ?', [now]);
+      } else {
+        // Timer is active: expires at the end of the one-off window
+        expiresAt = startedAt + timer * 1000;
+      }
     }
 
     await db.run('BEGIN TRANSACTION');

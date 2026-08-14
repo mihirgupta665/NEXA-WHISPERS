@@ -13,9 +13,20 @@ class ConversationService {
       [userId]
     );
 
+    const now = Date.now();
     const enrichedConversations = [];
 
     for (const conv of conversations) {
+      if (conv.disappearing_timer > 0 && conv.disappearing_timer_started_at) {
+        if (now >= conv.disappearing_timer_started_at + conv.disappearing_timer * 1000) {
+          await db.run(
+            'UPDATE conversations SET disappearing_timer = 0, disappearing_timer_started_at = NULL, updated_at = ? WHERE id = ?',
+            [now, conv.id]
+          );
+          conv.disappearing_timer = 0;
+          conv.disappearing_timer_started_at = null;
+        }
+      }
       // 2. Fetch members of the conversation
       const members = await db.all(
         `SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online, u.last_seen, cm.role
@@ -26,7 +37,6 @@ class ConversationService {
       );
 
       // 3. Fetch latest message
-      const now = Date.now();
       const latestMessage = await db.get(
         `SELECT m.id, m.content, m.message_type, m.status, m.sender_id, m.created_at, u.display_name as sender_name
          FROM messages m

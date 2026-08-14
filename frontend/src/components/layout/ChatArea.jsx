@@ -127,8 +127,12 @@ export default function ChatArea() {
         setCountdownSeconds(timerVal);
         return;
       }
-      const elapsedMs = elapsed % (timerVal * 1000);
-      const remainingMs = (timerVal * 1000) - elapsedMs;
+      if (elapsed >= timerVal * 1000) {
+        setCountdownSeconds(0);
+        api.put(`/api/conversations/${activeConversation.id}/disappearing-timer`, { timer: 0 }).catch(() => {});
+        return;
+      }
+      const remainingMs = (timerVal * 1000) - elapsed;
       setCountdownSeconds(Math.max(0, Math.ceil(remainingMs / 1000)));
     };
 
@@ -191,8 +195,9 @@ export default function ChatArea() {
     const startedAt = activeConversation.disappearing_timer_started_at || activeConversation.updated_at || now;
     if (conversationTimer > 0) {
       const elapsed = now - startedAt;
-      const windowIndex = Math.floor(elapsed / (conversationTimer * 1000));
-      optimisticMessage.expires_at = startedAt + (windowIndex + 1) * conversationTimer * 1000;
+      if (elapsed < conversationTimer * 1000) {
+        optimisticMessage.expires_at = startedAt + conversationTimer * 1000;
+      }
     }
 
     setMessages(prev => [...prev, optimisticMessage]);
