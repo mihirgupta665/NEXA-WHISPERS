@@ -734,30 +734,71 @@ SQLite/Turso provides the persistence layer depending on deployment configuratio
 
 ---
 
-# 💾 SQLite Persistence on Render
+# ☁️ Production Database Persistence — Turso
 
-SQLite databases stored on an ephemeral container filesystem can be lost during redeployments.
+Nexa Whispers uses **Turso**, a cloud-hosted SQLite database, for production persistence.
 
-For persistent SQLite storage on Render:
+Instead of storing the production database file inside the Render container, the backend connects to the remotely hosted Turso database. This keeps application data independent of the backend deployment lifecycle.
 
-1. Create a Render Persistent Disk.
-2. Mount it at a path such as:
+### Production Data Flow
 
 ```text
-/var/data
+React Frontend
+      ↓
+Node.js + Express
+      ↓
+Database Service
+      ↓
+Turso Cloud Database
+      ↓
+Persistent Application Data
 ```
 
-3. Configure:
+### Why Turso?
+
+* ☁️ Cloud-hosted SQLite database
+* 💾 Persistent data across backend redeployments
+* ⚡ Low-latency database access
+* 🔄 Independent from Render's ephemeral filesystem
+* 🗄️ SQLite-compatible SQL database
+* 🚀 Suitable for lightweight real-time applications
+
+### Production Configuration
+
+The backend uses environment variables to connect securely to the Turso database:
 
 ```env
-DATABASE_PATH=/var/data/database.db
+TURSO_DATABASE_URL=your_turso_database_url
+TURSO_AUTH_TOKEN=your_turso_auth_token
 ```
 
-The backend should use this environment variable when establishing its SQLite connection.
+Sensitive credentials are stored as **environment variables** and are never committed to the repository.
 
-This keeps the database file on persistent storage instead of the temporary deployment filesystem.
+### Deployment Architecture
 
----
+```text
+                    GitHub
+                      │
+              ┌───────┴───────┐
+              │               │
+              ▼               ▼
+           Vercel           Render
+              │               │
+              │        Node.js + Express
+              │               │
+              │          Socket.IO
+              │               │
+              │               ▼
+              │        Database Service
+              │               │
+              └───────────────┤
+                              ▼
+                       ☁️ Turso Cloud
+                         SQLite DB
+```
+
+This architecture ensures that **backend redeployments do not remove production chat data**, because the database is hosted independently from the Render application filesystem.
+
 
 # 🧠 Engineering Highlights
 
