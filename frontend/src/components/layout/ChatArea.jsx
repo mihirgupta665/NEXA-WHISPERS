@@ -597,10 +597,10 @@ export default function ChatArea() {
             }} 
             style={styles.headerActionButton} 
             className="hover-action-btn"
-            title="Conversation Settings"
-            aria-label="Conversation Settings"
+            title="Disappearing Messages Settings"
+            aria-label="Disappearing Messages Settings"
           >
-            <MoreVertical size={18} color={showSettingsDropdown ? 'var(--primary)' : 'var(--text-secondary)'} />
+            <Timer size={18} color={showSettingsDropdown ? 'var(--primary)' : 'var(--text-secondary)'} />
           </button>
           
           {showSettingsDropdown && (
