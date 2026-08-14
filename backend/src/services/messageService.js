@@ -34,42 +34,80 @@ class MessageService {
       [conversationId, limit, offset]
     );
 
-    const enrichedMessages = [];
+    if (messages.length === 0) {
+      return [];
+    }
 
-    for (const msg of messages) {
+    const messageIds = messages.map(m => m.id);
+    const placeholders = messageIds.map(() => '?').join(',');
+
+    // 4. Batch fetch reactions, attachments, and receipts in parallel
+    const [allReactions, allAttachments, allReceipts] = await Promise.all([
+      db.all(
+        `SELECT r.id, r.user_id, r.emoji, r.message_id, u.display_name as username 
+         FROM reactions r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.message_id IN (${placeholders})`,
+        messageIds
+      ),
+      db.all(
+        `SELECT * FROM attachments WHERE message_id IN (${placeholders})`,
+        messageIds
+      ),
+      db.all(
+        `SELECT mr.message_id, mr.user_id, mr.status, mr.delivered_at, mr.read_at, u.display_name
+         FROM message_receipts mr
+         JOIN users u ON mr.user_id = u.id
+         WHERE mr.message_id IN (${placeholders})`,
+        messageIds
+      )
+    ]);
+
+    // Map fetched relations to their corresponding messages by message_id
+    const reactionsMap = {};
+    const attachmentsMap = {};
+    const receiptsMap = {};
+
+    messageIds.forEach(id => {
+      reactionsMap[id] = [];
+      attachmentsMap[id] = null;
+      receiptsMap[id] = [];
+    });
+
+    allReactions.forEach(r => {
+      reactionsMap[r.message_id]?.push({
+        id: r.id,
+        user_id: r.user_id,
+        emoji: r.emoji,
+        username: r.username
+      });
+    });
+
+    allAttachments.forEach(a => {
+      attachmentsMap[a.message_id] = a;
+    });
+
+    allReceipts.forEach(rc => {
+      receiptsMap[rc.message_id]?.push({
+        user_id: rc.user_id,
+        status: rc.status,
+        delivered_at: rc.delivered_at,
+        read_at: rc.read_at,
+        display_name: rc.display_name
+      });
+    });
+
+    return messages.map(msg => {
       if (msg.sender_id === 0) {
         msg.sender_name = 'System';
       }
-      // Fetch reactions
-      const reactions = await db.all(
-        `SELECT r.id, r.user_id, r.emoji, u.display_name as username 
-         FROM reactions r
-         JOIN users u ON r.user_id = u.id
-         WHERE r.message_id = ?`,
-        [msg.id]
-      );
-
-      // Fetch attachment if any
-      const attachment = await db.get('SELECT * FROM attachments WHERE message_id = ?', [msg.id]);
-
-      // Fetch receipts (for status verification)
-      const receipts = await db.all(
-        `SELECT mr.user_id, mr.status, mr.delivered_at, mr.read_at, u.display_name
-         FROM message_receipts mr
-         JOIN users u ON mr.user_id = u.id
-         WHERE mr.message_id = ?`,
-        [msg.id]
-      );
-
-      enrichedMessages.push({
+      return {
         ...msg,
-        reactions,
-        attachment: attachment || null,
-        receipts
-      });
-    }
-
-    return enrichedMessages;
+        reactions: reactionsMap[msg.id] || [],
+        attachment: attachmentsMap[msg.id] || null,
+        receipts: receiptsMap[msg.id] || []
+      };
+    });
   }
 
   async getMessageById(messageId, userId) {

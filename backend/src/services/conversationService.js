@@ -16,77 +16,104 @@ class ConversationService {
       [userId]
     );
 
-    const now = Date.now();
-    const enrichedConversations = [];
-
-    for (const conv of conversations) {
-      if (conv.disappearing_timer > 0 && conv.disappearing_timer_started_at) {
-        if (now >= conv.disappearing_timer_started_at + conv.disappearing_timer * 1000) {
-          await db.run(
-            'UPDATE conversations SET disappearing_timer = 0, disappearing_timer_started_at = NULL, updated_at = ? WHERE id = ?',
-            [now, conv.id]
-          );
-          conv.disappearing_timer = 0;
-          conv.disappearing_timer_started_at = null;
-        }
-      }
-      // 2. Fetch members of the conversation
-      const members = await db.all(
-        `SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_online, u.last_seen, cm.role
-         FROM conversation_members cm
-         JOIN users u ON cm.user_id = u.id
-         WHERE cm.conversation_id = ?`,
-        [conv.id]
-      );
-
-      // 3. Fetch latest message
-      const latestMessage = await db.get(
-        `SELECT m.id, m.content, m.message_type, m.status, m.sender_id, m.created_at, u.display_name as sender_name
-         FROM messages m
-         JOIN users u ON m.sender_id = u.id
-         WHERE m.conversation_id = ?
-           AND (m.expires_at IS NULL OR m.expires_at > ?)
-         ORDER BY m.created_at DESC, m.id DESC
-         LIMIT 1`,
-        [conv.id, now]
-      );
-
-      // 4. Fetch unread count
-      const unread = await db.get(
-        `SELECT COUNT(m.id) as count
-         FROM messages m
-         LEFT JOIN message_receipts mr ON m.id = mr.message_id AND mr.user_id = ?
-         WHERE m.conversation_id = ?
-           AND m.sender_id != ?
-           AND (mr.status IS NULL OR mr.status != 'read')`,
-        [userId, conv.id, userId]
-      );
-
-      // If direct, resolve name & avatar to the other participant
-      let name = conv.name;
-      let avatarUrl = conv.avatar_url;
-      if (conv.type === 'direct') {
-        const otherMember = members.find(m => m.id !== userId);
-        if (otherMember) {
-          name = otherMember.display_name;
-          avatarUrl = otherMember.avatar_url;
-        } else {
-          // Self chat fallback
-          const self = members.find(m => m.id === userId);
-          name = self ? `${self.display_name} (You)` : 'Saved Messages';
-          avatarUrl = self ? self.avatar_url : '';
-        }
-      }
-
-      enrichedConversations.push({
-        ...conv,
-        name,
-        avatar_url: avatarUrl,
-        members,
-        latest_message: latestMessage || null,
-        unread_count: unread ? unread.count : 0
-      });
+    if (conversations.length === 0) {
+      return [];
     }
+
+    const now = Date.now();
+    const convIds = conversations.map(c => c.id);
+    const placeholders = convIds.map(() => '?').join(',');
+
+    // 2. Fetch members for all conversations in a single batch query
+    const allMembers = await db.all(
+      `SELECT cm.conversation_id, u.id, u.username, u.display_name, u.avatar_url, u.is_online, u.last_seen, cm.role
+       FROM conversation_members cm
+       JOIN users u ON cm.user_id = u.id
+       WHERE cm.conversation_id IN (${placeholders})`,
+      convIds
+    );
+
+    // Map members by conversation_id
+    const membersMap = {};
+    convIds.forEach(id => {
+      membersMap[id] = [];
+    });
+    allMembers.forEach(m => {
+      membersMap[m.conversation_id]?.push({
+        id: m.id,
+        username: m.username,
+        display_name: m.display_name,
+        avatar_url: m.avatar_url,
+        is_online: m.is_online,
+        last_seen: m.last_seen,
+        role: m.role
+      });
+    });
+
+    // 3. Parallelize fetching latest message and unread count per conversation
+    const enrichedConversations = await Promise.all(
+      conversations.map(async (conv) => {
+        if (conv.disappearing_timer > 0 && conv.disappearing_timer_started_at) {
+          if (now >= conv.disappearing_timer_started_at + conv.disappearing_timer * 1000) {
+            await db.run(
+              'UPDATE conversations SET disappearing_timer = 0, disappearing_timer_started_at = NULL, updated_at = ? WHERE id = ?',
+              [now, conv.id]
+            );
+            conv.disappearing_timer = 0;
+            conv.disappearing_timer_started_at = null;
+          }
+        }
+
+        const members = membersMap[conv.id] || [];
+
+        const [latestMessage, unread] = await Promise.all([
+          db.get(
+            `SELECT m.id, m.content, m.message_type, m.status, m.sender_id, m.created_at, u.display_name as sender_name
+             FROM messages m
+             JOIN users u ON m.sender_id = u.id
+             WHERE m.conversation_id = ?
+               AND (m.expires_at IS NULL OR m.expires_at > ?)
+             ORDER BY m.created_at DESC, m.id DESC
+             LIMIT 1`,
+            [conv.id, now]
+          ),
+          db.get(
+            `SELECT COUNT(m.id) as count
+             FROM messages m
+             LEFT JOIN message_receipts mr ON m.id = mr.message_id AND mr.user_id = ?
+             WHERE m.conversation_id = ?
+               AND m.sender_id != ?
+               AND (mr.status IS NULL OR mr.status != 'read')`,
+            [userId, conv.id, userId]
+          )
+        ]);
+
+        // If direct, resolve name & avatar to the other participant
+        let name = conv.name;
+        let avatarUrl = conv.avatar_url;
+        if (conv.type === 'direct') {
+          const otherMember = members.find(m => m.id !== userId);
+          if (otherMember) {
+            name = otherMember.display_name;
+            avatarUrl = otherMember.avatar_url;
+          } else {
+            // Self chat fallback
+            const self = members.find(m => m.id === userId);
+            name = self ? `${self.display_name} (You)` : 'Saved Messages';
+            avatarUrl = self ? self.avatar_url : '';
+          }
+        }
+
+        return {
+          ...conv,
+          name,
+          avatar_url: avatarUrl,
+          members,
+          latest_message: latestMessage || null,
+          unread_count: unread ? unread.count : 0
+        };
+      })
+    );
 
     // Sort by latest message date (or created_at if no messages) descending
     return enrichedConversations.sort((a, b) => {
