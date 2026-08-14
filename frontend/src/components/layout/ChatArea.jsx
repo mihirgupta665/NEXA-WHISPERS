@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext.jsx';
 import api from '../../services/api.js';
 import MessageBubble from '../chat/MessageBubble.jsx';
 import MessageComposer from '../chat/MessageComposer.jsx';
-import { Phone, Video, ArrowDown, ShieldAlert, ArrowLeft, X, Search, Info, MoreVertical } from 'lucide-react';
+import { Timer, Phone, Video, ArrowDown, ShieldAlert, ArrowLeft, X, Search, Info, MoreVertical } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 export default function ChatArea() {
@@ -29,6 +29,15 @@ export default function ChatArea() {
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(0);
+
+  const formatCountdown = (totalSeconds) => {
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(hrs)} : ${pad(mins)} : ${pad(secs)}`;
+  };
 
   const scrollContainerRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -101,6 +110,49 @@ export default function ChatArea() {
     }
   }, [highlightedMessageId, messages]);
 
+  // Hook for disappearing messages countdown
+  useEffect(() => {
+    if (!activeConversation || !activeConversation.disappearing_timer) {
+      setCountdownSeconds(0);
+      return;
+    }
+
+    const timerVal = activeConversation.disappearing_timer;
+    const startedAt = activeConversation.disappearing_timer_started_at || activeConversation.updated_at || Date.now();
+
+    const updateCountdown = () => {
+      const now = Date.now();
+      const elapsed = now - startedAt;
+      if (elapsed < 0) {
+        setCountdownSeconds(timerVal);
+        return;
+      }
+      const elapsedMs = elapsed % (timerVal * 1000);
+      const remainingMs = (timerVal * 1000) - elapsedMs;
+      setCountdownSeconds(Math.max(0, Math.ceil(remainingMs / 1000)));
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [activeConversation?.id, activeConversation?.disappearing_timer, activeConversation?.disappearing_timer_started_at]);
+
+  // Hook for filtering out expired messages in real-time
+  useEffect(() => {
+    if (!activeConversation || !activeConversation.disappearing_timer) return;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setMessages((prev) => {
+        const active = prev.filter((m) => !m.expires_at || m.expires_at > now);
+        if (active.length !== prev.length) {
+          return active;
+        }
+        return prev;
+      });
+    }, 500); // Check every 500ms
+    return () => clearInterval(interval);
+  }, [activeConversation?.id, activeConversation?.disappearing_timer]);
+
   const handleScrollEvent = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
@@ -136,8 +188,11 @@ export default function ChatArea() {
 
     // Read conversation disappearing message timer
     const conversationTimer = activeConversation.disappearing_timer || 0;
+    const startedAt = activeConversation.disappearing_timer_started_at || activeConversation.updated_at || now;
     if (conversationTimer > 0) {
-      optimisticMessage.expires_at = now + (conversationTimer * 1000);
+      const elapsed = now - startedAt;
+      const windowIndex = Math.floor(elapsed / (conversationTimer * 1000));
+      optimisticMessage.expires_at = startedAt + (windowIndex + 1) * conversationTimer * 1000;
     }
 
     setMessages(prev => [...prev, optimisticMessage]);
@@ -598,6 +653,13 @@ export default function ChatArea() {
           </button>
         </div>
       </div>
+
+      {activeConversation.disappearing_timer > 0 && countdownSeconds > 0 && (
+        <div style={styles.timerBox} className="anim-scale-up">
+          <Timer size={15} color="var(--primary)" style={{ animation: 'pulse 2s infinite' }} />
+          <span style={styles.timerText}>{formatCountdown(countdownSeconds)}</span>
+        </div>
+      )}
 
       {/* Message List Panel */}
       <div
@@ -1086,5 +1148,27 @@ const styles = {
     color: 'var(--text-secondary)',
     maxWidth: '320px',
     lineHeight: '1.5'
+  },
+  timerBox: {
+    position: 'absolute',
+    top: '86px',
+    right: '24px',
+    backgroundColor: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-md)',
+    padding: '8px 12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    zIndex: 99,
+    boxShadow: 'var(--shadow-md)',
+    animation: 'scale-up 0.2s ease'
+  },
+  timerText: {
+    fontFamily: 'var(--font-mono), monospace',
+    fontSize: '13px',
+    fontWeight: '700',
+    color: 'var(--primary)',
+    letterSpacing: '0.5px'
   }
 };

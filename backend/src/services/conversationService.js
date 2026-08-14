@@ -5,7 +5,7 @@ class ConversationService {
   async getConversations(userId) {
     // 1. Get all conversations user belongs to
     const conversations = await db.all(
-      `SELECT c.id, c.type, c.name, c.avatar_url, c.created_by, c.disappearing_timer, c.created_at, c.updated_at
+      `SELECT c.id, c.type, c.name, c.avatar_url, c.created_by, c.disappearing_timer, c.disappearing_timer_started_at, c.created_at, c.updated_at
        FROM conversations c
        JOIN conversation_members cm ON c.id = cm.conversation_id
        WHERE cm.user_id = ?
@@ -26,14 +26,16 @@ class ConversationService {
       );
 
       // 3. Fetch latest message
+      const now = Date.now();
       const latestMessage = await db.get(
         `SELECT m.id, m.content, m.message_type, m.status, m.sender_id, m.created_at, u.display_name as sender_name
          FROM messages m
          JOIN users u ON m.sender_id = u.id
          WHERE m.conversation_id = ?
+           AND (m.expires_at IS NULL OR m.expires_at > ?)
          ORDER BY m.created_at DESC, m.id DESC
          LIMIT 1`,
-        [conv.id]
+        [conv.id, now]
       );
 
       // 4. Fetch unread count
@@ -325,7 +327,11 @@ class ConversationService {
 
     // 3. Update database
     const now = Date.now();
-    await db.run('UPDATE conversations SET disappearing_timer = ?, updated_at = ? WHERE id = ?', [timer, now, conversationId]);
+    const startedAt = timer > 0 ? now : null;
+    await db.run(
+      'UPDATE conversations SET disappearing_timer = ?, disappearing_timer_started_at = ?, updated_at = ? WHERE id = ?',
+      [timer, startedAt, now, conversationId]
+    );
 
     // 4. Automatically write a system notification message (sender_id = 0)
     const systemMsgId = `system-${now}-${Math.round(Math.random() * 1e6)}`;

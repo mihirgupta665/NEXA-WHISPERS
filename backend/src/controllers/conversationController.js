@@ -183,6 +183,7 @@ class ConversationController {
         io.to(`conversation_${conversationId}`).emit('conversation:disappearing-timer', {
           conversationId,
           disappearing_timer: parseInt(timer),
+          disappearing_timer_started_at: data.conversation.disappearing_timer_started_at,
           updatedBy: req.user.id,
           username: req.user.username
         });

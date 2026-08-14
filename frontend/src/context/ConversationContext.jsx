@@ -269,13 +269,13 @@ export function ConversationProvider({ children }) {
     });
 
     // Listen for disappearing timer updates
-    socket.on('conversation:disappearing-timer', ({ conversationId, disappearing_timer }) => {
+    socket.on('conversation:disappearing-timer', ({ conversationId, disappearing_timer, disappearing_timer_started_at }) => {
       setConversations((prev) =>
-        prev.map((c) => (c.id === conversationId ? { ...c, disappearing_timer } : c))
+        prev.map((c) => (c.id === conversationId ? { ...c, disappearing_timer, disappearing_timer_started_at } : c))
       );
       const activeConv = activeConversationRef.current;
       if (activeConv && activeConv.id === conversationId) {
-        setActiveConversation((prev) => ({ ...prev, disappearing_timer }));
+        setActiveConversation((prev) => ({ ...prev, disappearing_timer, disappearing_timer_started_at }));
       }
     });
 

@@ -44,6 +44,7 @@ export async function initSchema() {
         avatar_url TEXT,
         created_by INTEGER,
         disappearing_timer INTEGER DEFAULT 0,
+        disappearing_timer_started_at INTEGER,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
@@ -152,7 +153,27 @@ export async function initSchema() {
     await db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_reactions_msg_user ON reactions(message_id, user_id);`);
     await db.run(`CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);`);
 
+    // Ensure system user (id = 0) exists for system messages (foreign key constraint)
+    const systemUser = await db.get('SELECT id FROM users WHERE id = 0');
+    if (!systemUser) {
+      const now = Date.now();
+      await db.run(
+        `INSERT OR IGNORE INTO users (id, username, phone, password_hash, display_name, avatar_url, is_online, last_seen, created_at, updated_at)
+         VALUES (0, 'system_user', 'system_phone', 'system_hash', 'System', null, 0, ?, ?, ?)`,
+        [now, now, now]
+      );
+      console.log('[Database] Seeding: Created System user (ID 0).');
+    }
+
     await db.run('COMMIT');
+
+    // Migration helper for disappearing_timer_started_at
+    try {
+      await db.run('ALTER TABLE conversations ADD COLUMN disappearing_timer_started_at INTEGER');
+      console.log('[Database] Migration: Added disappearing_timer_started_at column to conversations table.');
+    } catch (e) {
+      // Column might already exist
+    }
 
     // Migration helper for pre-existing databases
     try {

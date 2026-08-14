@@ -34,6 +34,7 @@ export async function seedDatabase() {
 
      // 1. Insert Users
     const users = [
+      { id: 0, username: 'system_user', phone: 'system_phone', display_name: 'System', avatar_url: null },
       { id: 1, username: 'mihir', phone: '+919999999999', display_name: 'Mihir', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Mihir' },
       { id: 2, username: 'rahul', phone: '+918888888888', display_name: 'Rahul', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Rahul' },
       { id: 3, username: 'ananya', phone: '+917777777777', display_name: 'Ananya', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Ananya' },

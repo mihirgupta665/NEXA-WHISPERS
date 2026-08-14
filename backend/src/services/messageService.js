@@ -69,7 +69,7 @@ class MessageService {
        WHERE m.id = ?`,
       [messageId]
     );
-    if (!msg) {
+    if (!msg || (msg.expires_at && msg.expires_at < Date.now())) {
       throw new NotFoundError('Message not found.');
     }
     if (msg.sender_id === 0) {
@@ -123,11 +123,14 @@ class MessageService {
     let messageId;
 
     // Check conversation-level disappearing message settings
-    const conv = await db.get('SELECT disappearing_timer FROM conversations WHERE id = ?', [conversationId]);
+    const conv = await db.get('SELECT disappearing_timer, disappearing_timer_started_at FROM conversations WHERE id = ?', [conversationId]);
     const timer = conv ? conv.disappearing_timer : 0;
+    const startedAt = (conv && conv.disappearing_timer_started_at) ? conv.disappearing_timer_started_at : (conv ? conv.updated_at : now);
     let expiresAt = expires_at;
     if (timer > 0) {
-      expiresAt = now + (timer * 1000);
+      const elapsed = now - startedAt;
+      const windowIndex = Math.floor(elapsed / (timer * 1000));
+      expiresAt = startedAt + (windowIndex + 1) * timer * 1000;
     }
 
     await db.run('BEGIN TRANSACTION');
