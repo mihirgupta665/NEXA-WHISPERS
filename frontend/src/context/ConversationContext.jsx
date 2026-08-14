@@ -279,6 +279,25 @@ export function ConversationProvider({ children }) {
       }
     });
 
+    // Listen for pinned message updates
+    socket.on('conversation:pinned-message', async ({ conversationId }) => {
+      try {
+        const res = await api.get(`/api/conversations/${conversationId}`);
+        if (res.data.success) {
+          const updatedConv = res.data.data;
+          setConversations((prev) =>
+            prev.map((c) => (c.id === conversationId ? updatedConv : c))
+          );
+          const activeConv = activeConversationRef.current;
+          if (activeConv && activeConv.id === conversationId) {
+            setActiveConversation(updatedConv);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync pinned message:', err);
+      }
+    });
+
     return () => {
       socket.off('message:new');
       socket.off('message:status');
@@ -290,6 +309,7 @@ export function ConversationProvider({ children }) {
       socket.off('user:offline');
       socket.off('conversation:created');
       socket.off('conversation:disappearing-timer');
+      socket.off('conversation:pinned-message');
     };
   }, [socket, isConnected, user]);
 

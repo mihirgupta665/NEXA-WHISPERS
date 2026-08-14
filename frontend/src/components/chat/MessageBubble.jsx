@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { Check, CheckCheck, CornerUpLeft, Copy, Trash2, FileText, Download, ChevronDown } from 'lucide-react';
+import { Check, CheckCheck, CornerUpLeft, Copy, Trash2, FileText, Download, ChevronDown, Pin } from 'lucide-react';
 import { toast } from 'react-toastify';
 
-export default function MessageBubble({ message, messagesList, onReplyClick, onReact, onDelete, groupPosition = 'none', onRetry, onRemoveFailed }) {
+export default function MessageBubble({ message, messagesList, onReplyClick, onReact, onDelete, groupPosition = 'none', onRetry, onRemoveFailed, onPinClick }) {
   const { user } = useAuth();
   const isMe = message.sender_id === user.id;
 
@@ -249,7 +249,6 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
       onMouseEnter={() => setShowHoverActions(true)}
       onMouseLeave={() => {
         setShowHoverActions(false);
-        setIsActionMenuOpen(false);
       }}
       style={{
         ...styles.wrapper,
@@ -328,6 +327,9 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
               </>
             ) : (
               <>
+                <button className="premium-context-menu-item" onClick={() => { onPinClick(message); setIsActionMenuOpen(false); }}>
+                  <Pin size={14} /> Pin Message
+                </button>
                 <button className="premium-context-menu-item" onClick={() => { onReplyClick(message); setIsActionMenuOpen(false); }}>
                   <CornerUpLeft size={14} /> Reply
                 </button>

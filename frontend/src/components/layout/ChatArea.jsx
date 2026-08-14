@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext.jsx';
 import api from '../../services/api.js';
 import MessageBubble from '../chat/MessageBubble.jsx';
 import MessageComposer from '../chat/MessageComposer.jsx';
-import { Timer, Phone, Video, ArrowDown, ShieldAlert, ArrowLeft, X, Search, Info, MoreVertical } from 'lucide-react';
+import { Timer, Phone, Video, ArrowDown, ShieldAlert, ArrowLeft, X, Search, Info, MoreVertical, Pin } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 export default function ChatArea() {
@@ -341,6 +341,46 @@ export default function ChatArea() {
     }
   };
 
+  const handlePinMessage = async (message) => {
+    try {
+      const res = await api.put(`/api/conversations/${activeConversation.id}/pin-message`, { messageId: message.id });
+      if (res.data.success) {
+        toast.success('Message pinned successfully.');
+      }
+    } catch (err) {
+      toast.error('Failed to pin message.');
+    }
+  };
+
+  const handleUnpinMessage = async () => {
+    try {
+      const res = await api.put(`/api/conversations/${activeConversation.id}/unpin-message`);
+      if (res.data.success) {
+        toast.success('Message unpinned successfully.');
+      }
+    } catch (err) {
+      toast.error('Failed to unpin message.');
+    }
+  };
+
+  const handleScrollToPinnedMessage = () => {
+    const messageId = activeConversation.pinned_message_id;
+    if (!messageId) return;
+    const element = document.getElementById(`message-${messageId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const bubble = element.querySelector('.msg-bubble-card');
+      if (bubble) {
+        bubble.classList.add('message-highlight-pulse');
+        setTimeout(() => {
+          bubble.classList.remove('message-highlight-pulse');
+        }, 2000);
+      }
+    } else {
+      toast.info('Pinned message is not in current view.');
+    }
+  };
+
   // Keyboard shortcuts event listener
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
@@ -507,6 +547,7 @@ export default function ChatArea() {
         groupPosition={groupPosition}
         onRetry={handleRetryMessage}
         onRemoveFailed={handleRemoveFailedMessage}
+        onPinClick={handlePinMessage}
       />
     );
   });
@@ -664,6 +705,23 @@ export default function ChatArea() {
         <div style={styles.timerBox} className="anim-scale-up">
           <Timer size={15} color="var(--primary)" style={{ animation: 'pulse 2s infinite' }} />
           <span style={styles.timerText}>{formatCountdown(countdownSeconds)}</span>
+        </div>
+      )}
+
+      {activeConversation.pinned_message_id && (
+        <div style={styles.pinnedBanner} className="anim-fade-in">
+          <div style={styles.pinnedLeft} onClick={handleScrollToPinnedMessage}>
+            <Pin size={14} color="var(--primary)" style={{ transform: 'rotate(45deg)' }} />
+            <div style={styles.pinnedMeta}>
+              <span style={styles.pinnedSender}>Pinned: {activeConversation.pinned_message_sender_name || 'System'}</span>
+              <span style={styles.pinnedSnippet}>
+                {activeConversation.pinned_message_type === 'attachment' ? '[Attachment]' : activeConversation.pinned_message_content}
+              </span>
+            </div>
+          </div>
+          <button onClick={handleUnpinMessage} style={styles.unpinButton} title="Unpin message">
+            <X size={16} />
+          </button>
         </div>
       )}
 
@@ -1176,5 +1234,51 @@ const styles = {
     fontWeight: '700',
     color: 'var(--primary)',
     letterSpacing: '0.5px'
+  },
+  pinnedBanner: {
+    padding: '8px 24px',
+    backgroundColor: 'var(--surface)',
+    borderBottom: '1px solid var(--border)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 8,
+    boxShadow: 'var(--shadow-sm)'
+  },
+  pinnedLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    cursor: 'pointer',
+    flex: 1
+  },
+  pinnedMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden'
+  },
+  pinnedSender: {
+    fontSize: '12px',
+    fontWeight: '700',
+    color: 'var(--primary)'
+  },
+  pinnedSnippet: {
+    fontSize: '13px',
+    color: 'var(--text-secondary)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '500px'
+  },
+  unpinButton: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 'var(--radius-full)'
   }
 };

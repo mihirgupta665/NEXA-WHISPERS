@@ -197,6 +197,51 @@ class ConversationController {
       next(err);
     }
   }
+
+  async pinMessage(req, res, next) {
+    try {
+      const conversationId = parseInt(req.params.id);
+      const { messageId } = req.body;
+      const data = await conversationService.pinMessage(conversationId, req.user.id, parseInt(messageId));
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`conversation_${conversationId}`).emit('conversation:pinned-message', {
+          conversationId,
+          pinned_message_id: parseInt(messageId)
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async unpinMessage(req, res, next) {
+    try {
+      const conversationId = parseInt(req.params.id);
+      const data = await conversationService.unpinMessage(conversationId, req.user.id);
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`conversation_${conversationId}`).emit('conversation:pinned-message', {
+          conversationId,
+          pinned_message_id: null
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export default new ConversationController();

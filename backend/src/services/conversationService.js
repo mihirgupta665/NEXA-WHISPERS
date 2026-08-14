@@ -5,9 +5,12 @@ class ConversationService {
   async getConversations(userId) {
     // 1. Get all conversations user belongs to
     const conversations = await db.all(
-      `SELECT c.id, c.type, c.name, c.avatar_url, c.created_by, c.disappearing_timer, c.disappearing_timer_started_at, c.created_at, c.updated_at
+      `SELECT c.id, c.type, c.name, c.avatar_url, c.created_by, c.disappearing_timer, c.disappearing_timer_started_at, c.pinned_message_id, c.created_at, c.updated_at,
+              m_pin.content as pinned_message_content, m_pin.message_type as pinned_message_type, u_pin.display_name as pinned_message_sender_name
        FROM conversations c
        JOIN conversation_members cm ON c.id = cm.conversation_id
+       LEFT JOIN messages m_pin ON c.pinned_message_id = m_pin.id
+       LEFT JOIN users u_pin ON m_pin.sender_id = u_pin.id
        WHERE cm.user_id = ?
        ORDER BY c.updated_at DESC`,
       [userId]
@@ -105,7 +108,14 @@ class ConversationService {
   }
 
   async getConversationById(conversationId, userId) {
-    const conv = await db.get('SELECT * FROM conversations WHERE id = ?', [conversationId]);
+    const conv = await db.get(
+      `SELECT c.*, m_pin.content as pinned_message_content, m_pin.message_type as pinned_message_type, u_pin.display_name as pinned_message_sender_name
+       FROM conversations c
+       LEFT JOIN messages m_pin ON c.pinned_message_id = m_pin.id
+       LEFT JOIN users u_pin ON m_pin.sender_id = u_pin.id
+       WHERE c.id = ?`,
+      [conversationId]
+    );
     if (!conv) {
       throw new NotFoundError('Conversation not found.');
     }
@@ -379,6 +389,22 @@ class ConversationService {
 
     const conversation = await this.getConversationById(conversationId, userId);
     return { conversation, systemMessage: systemMsg };
+  }
+
+  async pinMessage(conversationId, userId, messageId) {
+    await this.checkMembership(conversationId, userId);
+    const msg = await db.get('SELECT id FROM messages WHERE id = ? AND conversation_id = ?', [messageId, conversationId]);
+    if (!msg) {
+      throw new NotFoundError('Message not found in this conversation.');
+    }
+    await db.run('UPDATE conversations SET pinned_message_id = ?, updated_at = ? WHERE id = ?', [messageId, Date.now(), conversationId]);
+    return this.getConversationById(conversationId, userId);
+  }
+
+  async unpinMessage(conversationId, userId) {
+    await this.checkMembership(conversationId, userId);
+    await db.run('UPDATE conversations SET pinned_message_id = NULL, updated_at = ? WHERE id = ?', [Date.now(), conversationId]);
+    return this.getConversationById(conversationId, userId);
   }
 }
 

@@ -45,9 +45,11 @@ export async function initSchema() {
         created_by INTEGER,
         disappearing_timer INTEGER DEFAULT 0,
         disappearing_timer_started_at INTEGER,
+        pinned_message_id INTEGER,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
-        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY (pinned_message_id) REFERENCES messages(id) ON DELETE SET NULL
       )
     `);
 
@@ -166,6 +168,14 @@ export async function initSchema() {
     }
 
     await db.run('COMMIT');
+
+    // Migration helper for pinned_message_id
+    try {
+      await db.run('ALTER TABLE conversations ADD COLUMN pinned_message_id INTEGER');
+      console.log('[Database] Migration: Added pinned_message_id column to conversations table.');
+    } catch (e) {
+      // Column might already exist
+    }
 
     // Migration helper for disappearing_timer_started_at
     try {

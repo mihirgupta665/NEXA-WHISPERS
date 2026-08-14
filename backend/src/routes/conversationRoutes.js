@@ -16,6 +16,8 @@ router.post('/group', validateCreateGroup, conversationController.createGroup);
 router.get('/:id', conversationController.getConversationDetails);
 router.get('/:id/messages', conversationController.getConversationMessages);
 router.put('/:id/disappearing-timer', conversationController.updateDisappearingTimer);
+router.put('/:id/pin-message', conversationController.pinMessage);
+router.put('/:id/unpin-message', conversationController.unpinMessage);
 
 // Send message with optional file upload integration
 router.post('/:id/messages', upload.single('file'), validateSendMessage, messageController.sendMessage);
