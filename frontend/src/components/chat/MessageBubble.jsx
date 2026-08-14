@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Check, CheckCheck, CornerUpLeft, Copy, Trash2, FileText, Download, ChevronDown, Pin } from 'lucide-react';
 import { toast } from 'react-toastify';
+import api from '../../services/api.js';
 
 export default function MessageBubble({ message, messagesList, onReplyClick, onReact, onDelete, groupPosition = 'none', onRetry, onRemoveFailed, onPinClick }) {
   const { user } = useAuth();
@@ -89,19 +90,61 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
     setIsActionMenuOpen(false);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!message.attachment) return;
-    const attachmentUrl = message.attachment.file_url?.startsWith('data:')
-      ? message.attachment.file_url
-      : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${message.attachment.file_url}`;
-      
-    const link = document.createElement('a');
-    link.href = attachmentUrl;
-    link.download = message.attachment.file_name;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const fileName = message.attachment.file_name;
+    const fileUrl = message.attachment.file_url;
+
+    // If it's a data URL, we can download it directly
+    if (fileUrl?.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setIsActionMenuOpen(false);
+      return;
+    }
+
+    const toastId = toast.loading(`Downloading ${fileName}...`);
+    try {
+      const response = await api.get(fileUrl, {
+        responseType: 'blob'
+      });
+
+      const blob = response.data;
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.update(toastId, {
+        render: 'Download complete!',
+        type: 'success',
+        isLoading: false,
+        autoClose: 2000
+      });
+    } catch (err) {
+      console.error('[Download Error] Failed to download attachment:', err);
+      toast.update(toastId, {
+        render: 'Failed to download file.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000
+      });
+    }
     setIsActionMenuOpen(false);
   };
 
@@ -394,21 +437,26 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
                   <img
                     src={attachmentUrl}
                     alt={message.attachment.file_name}
-                    style={styles.attachmentImage}
+                    style={{ ...styles.attachmentImage, cursor: 'pointer' }}
+                    onClick={handleDownload}
+                    title="Click to download image"
                   />
                 ) : (
-                  <div style={styles.fileCard}>
+                  <div 
+                    style={{ ...styles.fileCard, cursor: 'pointer' }}
+                    onClick={handleDownload}
+                    title="Click to download file"
+                  >
                     <FileText size={24} color="var(--primary)" />
                     <div style={styles.fileCardMeta}>
                       <span style={styles.fileName}>{message.attachment.file_name}</span>
                       <span style={styles.fileSize}>{formatFileSize(message.attachment.file_size)}</span>
                     </div>
                     <a
-                      href={attachmentUrl}
-                      download={message.attachment.file_name}
-                      target="_blank"
-                      rel="noreferrer"
+                      href="#"
+                      onClick={handleDownload}
                       style={styles.downloadButton}
+                      title="Download file"
                     >
                       <Download size={16} />
                     </a>

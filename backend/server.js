@@ -3,12 +3,18 @@ import dotenv from 'dotenv';
 import app from './src/app.js';
 import { initSocketServer } from './src/sockets/socketServer.js';
 import { initSchema } from './src/database/schema.js';
+import { seedDatabase } from './src/database/seed.js';
 import storyService from './src/services/storyService.js';
 
 dotenv.config();
 
-// Initialize database schema and auto-seed stories on startup
+// Initialize database schema and auto-seed database on startup
 await initSchema();
+try {
+  await seedDatabase();
+} catch (err) {
+  console.warn('[Database] Auto-seeding skipped or failed:', err.message);
+}
 await storyService.checkAndSeedStories();
 
 const server = http.createServer(app);
