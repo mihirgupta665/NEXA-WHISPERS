@@ -2,6 +2,7 @@ import messageService from '../services/messageService.js';
 import db from '../database/connection.js';
 import conversationService from '../services/conversationService.js';
 import { NotFoundError } from '../middleware/errorHandler.js';
+import { isCloudinaryConfigured, uploadToCloudinary } from '../services/cloudinaryService.js';
 
 class MessageController {
   async sendMessage(req, res, next) {
@@ -30,12 +31,25 @@ class MessageController {
       // Save attachment payload details if file is present
       if (req.file) {
         const fileData = req.file.buffer || Buffer.alloc(0);
-        const fileUrl = `data:${req.file.mimetype};base64,${fileData.toString('base64')}`;
+        let fileUrl = `data:${req.file.mimetype};base64,${fileData.toString('base64')}`;
+        let finalData = fileData;
+
+        if (isCloudinaryConfigured) {
+          try {
+            console.log(`[Cloudinary] Uploading attachment: ${req.file.originalname}`);
+            const result = await uploadToCloudinary(fileData, req.file.originalname);
+            fileUrl = result.secure_url;
+            finalData = result.secure_url;
+            console.log(`[Cloudinary] Upload succeeded. URL: ${fileUrl}`);
+          } catch (uploadErr) {
+            console.error('[Cloudinary] Upload failed, falling back to database BLOB:', uploadErr);
+          }
+        }
 
         await messageService.addAttachment(message.id, {
           file_name: req.file.originalname,
           file_url: fileUrl,
-          file_data: fileData,
+          file_data: finalData,
           file_type: req.file.mimetype,
           file_size: req.file.size
         });
@@ -126,6 +140,15 @@ class MessageController {
       await conversationService.checkMembership(attachment.conversation_id, req.user.id);
       
       let data = attachment.file_data;
+      if (typeof data === 'string' && data.startsWith('http')) {
+        let downloadableUrl = data;
+        if (downloadableUrl.includes('/upload/')) {
+          downloadableUrl = downloadableUrl.replace('/upload/', '/upload/fl_attachment/');
+        }
+        console.log(`[Cloudinary] Redirecting download request to: ${downloadableUrl}`);
+        return res.redirect(downloadableUrl);
+      }
+
       if (typeof data === 'string') {
         data = Buffer.from(data, 'base64');
       } else if (!Buffer.isBuffer(data)) {
