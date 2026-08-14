@@ -19,7 +19,7 @@ const isNonRetryableError = (err) => {
   if (err.code && (err.code.startsWith('SQLITE_CONSTRAINT') || err.code === 'SQLITE_ERROR')) return true;
   
   const msg = (err.message || '').toLowerCase();
-  if (msg.includes('constraint failed') || msg.includes('syntax error') || msg.includes('no such table') || msg.includes('no such column')) return true;
+  if (msg.includes('constraint failed') || msg.includes('syntax error') || msg.includes('no such table') || msg.includes('no such column') || msg.includes('duplicate column')) return true;
   
   return false;
 };
