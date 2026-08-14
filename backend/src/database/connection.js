@@ -10,16 +10,40 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Fallback to local file relative to backend folder if not absolute
-const dbPathConfig = process.env.DATABASE_PATH || 'database/database.db';
-const dbPath = path.isAbsolute(dbPathConfig)
-  ? dbPathConfig
-  : path.resolve(__dirname, '../../', dbPathConfig);
+const candidatePaths = [];
 
-// Ensure the target database directory exists
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+if (process.env.DATABASE_PATH) {
+  candidatePaths.push(process.env.DATABASE_PATH);
+}
+
+candidatePaths.push(
+  path.resolve(__dirname, '../../database/database.db'),
+  path.resolve(process.cwd(), 'database/database.db'),
+  '/tmp/nexa-whispers/database.db'
+);
+
+let dbPath;
+for (const candidate of candidatePaths) {
+  const resolved = path.isAbsolute(candidate)
+    ? candidate
+    : path.resolve(__dirname, '../../', candidate);
+
+  const dir = path.dirname(resolved);
+
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.accessSync(dir, fs.constants.W_OK);
+    dbPath = resolved;
+    break;
+  } catch (err) {
+    console.warn(`[Database] Skipping unwritable path: ${resolved}`);
+  }
+}
+
+if (!dbPath) {
+  throw new Error('No writable SQLite directory available. Please set DATABASE_PATH to a writable folder.');
 }
 
 console.log(`[Database] Connecting to SQLite DB at: ${dbPath}`);
