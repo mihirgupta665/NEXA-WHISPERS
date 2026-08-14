@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { AsyncLocalStorage } from 'async_hooks';
 
 dotenv.config();
 
@@ -14,8 +13,6 @@ const __dirname = path.dirname(__filename);
 const isTurso = !!process.env.TURSO_DATABASE_URL;
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const transactionStorage = new AsyncLocalStorage();
 
 const isNonRetryableError = (err) => {
   if (!err) return false;
@@ -56,56 +53,20 @@ if (isTurso) {
 
   db = {
     run: async (sql, ...args) => {
-      const sqlUpper = sql.trim().toUpperCase();
-      if (sqlUpper.startsWith('BEGIN')) {
-        const tx = await client.transaction();
-        transactionStorage.enterWith(tx);
-        return { lastID: undefined, changes: 0 };
-      }
-      if (sqlUpper.startsWith('COMMIT')) {
-        const tx = transactionStorage.getStore();
-        if (tx) {
-          await tx.commit();
-          transactionStorage.enterWith(undefined);
-        }
-        return { lastID: undefined, changes: 0 };
-      }
-      if (sqlUpper.startsWith('ROLLBACK')) {
-        const tx = transactionStorage.getStore();
-        if (tx) {
-          try {
-            await tx.rollback();
-          } catch (e) {
-            // Already rolled back or failed
-          }
-          transactionStorage.enterWith(undefined);
-        }
-        return { lastID: undefined, changes: 0 };
-      }
-
-      const tx = transactionStorage.getStore();
-      const executor = tx || client;
-      
-      const res = await executeWithRetry(executor.run, executor, [sql, ...args]);
+      const res = await executeWithRetry(client.run, client, [sql, ...args]);
       return {
         lastID: res.lastInsertRowid !== undefined ? Number(res.lastInsertRowid) : undefined,
         changes: res.changes
       };
     },
     get: async (sql, ...args) => {
-      const tx = transactionStorage.getStore();
-      const executor = tx || client;
-      return await executeWithRetry(executor.get, executor, [sql, ...args]);
+      return await executeWithRetry(client.get, client, [sql, ...args]);
     },
     all: async (sql, ...args) => {
-      const tx = transactionStorage.getStore();
-      const executor = tx || client;
-      return await executeWithRetry(executor.all, executor, [sql, ...args]);
+      return await executeWithRetry(client.all, client, [sql, ...args]);
     },
     exec: async (sql) => {
-      const tx = transactionStorage.getStore();
-      const executor = tx || client;
-      return await executeWithRetry(executor.exec, executor, [sql]);
+      return await executeWithRetry(client.exec, client, [sql]);
     },
     prepare: () => {
       throw new Error('db.prepare is not supported on Turso Cloud Database.');
