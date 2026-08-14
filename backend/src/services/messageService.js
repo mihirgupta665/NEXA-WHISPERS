@@ -51,7 +51,7 @@ class MessageService {
         messageIds
       ),
       db.all(
-        `SELECT * FROM attachments WHERE message_id IN (${placeholders})`,
+        `SELECT id, message_id, file_name, file_url, file_type, file_size, created_at FROM attachments WHERE message_id IN (${placeholders})`,
         messageIds
       ),
       db.all(
@@ -135,7 +135,7 @@ class MessageService {
       [msg.id]
     );
 
-    const attachment = await db.get('SELECT * FROM attachments WHERE message_id = ?', [msg.id]);
+    const attachment = await db.get('SELECT id, message_id, file_name, file_url, file_type, file_size, created_at FROM attachments WHERE message_id = ?', [msg.id]);
 
     const receipts = await db.all(
       `SELECT mr.user_id, mr.status, mr.delivered_at, mr.read_at, u.display_name
@@ -230,10 +230,16 @@ class MessageService {
 
   async addAttachment(messageId, { file_name, file_url, file_data, file_type, file_size }) {
     const now = Date.now();
-    await db.run(
+    const result = await db.run(
       `INSERT INTO attachments (message_id, file_name, file_url, file_data, file_type, file_size, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [messageId, file_name, file_url, file_data || null, file_type, file_size, now]
+      [messageId, file_name, '', file_data || null, file_type, file_size, now]
+    );
+    const attachmentId = result.lastID;
+    const dynamicUrl = `/api/messages/attachments/${attachmentId}`;
+    await db.run(
+      'UPDATE attachments SET file_url = ? WHERE id = ?',
+      [dynamicUrl, attachmentId]
     );
   }
 

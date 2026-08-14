@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { AsyncLocalStorage } from 'async_hooks';
 
 dotenv.config();
 
@@ -11,6 +12,38 @@ const __dirname = path.dirname(__filename);
 
 // Determine if we should connect to Turso Cloud Database
 const isTurso = !!process.env.TURSO_DATABASE_URL;
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const transactionStorage = new AsyncLocalStorage();
+
+const isNonRetryableError = (err) => {
+  if (!err) return false;
+  if (err.code && (err.code.startsWith('SQLITE_CONSTRAINT') || err.code === 'SQLITE_ERROR')) return true;
+  
+  const msg = (err.message || '').toLowerCase();
+  if (msg.includes('constraint failed') || msg.includes('syntax error') || msg.includes('no such table') || msg.includes('no such column')) return true;
+  
+  return false;
+};
+
+const executeWithRetry = async (fn, context, args, retries = 5, delayMs = 1000) => {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn.apply(context, args);
+    } catch (err) {
+      attempt++;
+      const canRetry = !isNonRetryableError(err);
+      if (canRetry && attempt <= retries) {
+        console.warn(`[Database Retry] Attempt ${attempt}/${retries} failed: ${err.message || err}. Retrying in ${delayMs}ms...`);
+        await delay(delayMs);
+      } else {
+        throw err;
+      }
+    }
+  }
+};
 
 let db;
 
@@ -23,20 +56,56 @@ if (isTurso) {
 
   db = {
     run: async (sql, ...args) => {
-      const res = await client.run(sql, ...args);
+      const sqlUpper = sql.trim().toUpperCase();
+      if (sqlUpper.startsWith('BEGIN')) {
+        const tx = await client.transaction();
+        transactionStorage.enterWith(tx);
+        return { lastID: undefined, changes: 0 };
+      }
+      if (sqlUpper.startsWith('COMMIT')) {
+        const tx = transactionStorage.getStore();
+        if (tx) {
+          await tx.commit();
+          transactionStorage.enterWith(undefined);
+        }
+        return { lastID: undefined, changes: 0 };
+      }
+      if (sqlUpper.startsWith('ROLLBACK')) {
+        const tx = transactionStorage.getStore();
+        if (tx) {
+          try {
+            await tx.rollback();
+          } catch (e) {
+            // Already rolled back or failed
+          }
+          transactionStorage.enterWith(undefined);
+        }
+        return { lastID: undefined, changes: 0 };
+      }
+
+      const tx = transactionStorage.getStore();
+      const executor = tx || client;
+      
+      const res = await executeWithRetry(executor.run, executor, [sql, ...args]);
       return {
         lastID: res.lastInsertRowid !== undefined ? Number(res.lastInsertRowid) : undefined,
         changes: res.changes
       };
     },
     get: async (sql, ...args) => {
-      return await client.get(sql, ...args);
+      const tx = transactionStorage.getStore();
+      const executor = tx || client;
+      return await executeWithRetry(executor.get, executor, [sql, ...args]);
     },
     all: async (sql, ...args) => {
-      return await client.all(sql, ...args);
+      const tx = transactionStorage.getStore();
+      const executor = tx || client;
+      return await executeWithRetry(executor.all, executor, [sql, ...args]);
     },
     exec: async (sql) => {
-      return await client.exec(sql);
+      const tx = transactionStorage.getStore();
+      const executor = tx || client;
+      return await executeWithRetry(executor.exec, executor, [sql]);
     },
     prepare: () => {
       throw new Error('db.prepare is not supported on Turso Cloud Database.');
@@ -99,35 +168,14 @@ if (isTurso) {
   await rawDb.run('PRAGMA busy_timeout = 5000');
   console.log('[Database] SQLite foreign key constraints and busy timeout (5000ms) enabled.');
 
-  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-  const executeWithRetry = async (fn, args, retries = 3, delayMs = 100) => {
-    let attempt = 0;
-    while (attempt < retries) {
-      try {
-        return await fn.apply(rawDb, args);
-      } catch (err) {
-        attempt++;
-        const isLockError = err.code === 'SQLITE_BUSY' || err.message?.includes('locked') || err.message?.includes('busy');
-        if (isLockError && attempt < retries) {
-          console.warn(`[Database Retry] SQLITE_BUSY detected. Retrying attempt ${attempt}/${retries} after ${delayMs}ms...`);
-          await delay(delayMs * Math.pow(2, attempt));
-        } else {
-          throw err;
-        }
-      }
-    }
-  };
-
   db = {
-    run: (...args) => executeWithRetry(rawDb.run, args),
-    get: (...args) => executeWithRetry(rawDb.get, args),
-    all: (...args) => executeWithRetry(rawDb.all, args),
-    exec: (...args) => executeWithRetry(rawDb.exec, args),
+    run: (...args) => executeWithRetry(rawDb.run, rawDb, args),
+    get: (...args) => executeWithRetry(rawDb.get, rawDb, args),
+    all: (...args) => executeWithRetry(rawDb.all, rawDb, args),
+    exec: (...args) => executeWithRetry(rawDb.exec, rawDb, args),
     prepare: (...args) => rawDb.prepare(...args),
     close: () => rawDb.close()
   };
 }
 
 export default db;
-

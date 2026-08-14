@@ -1,4 +1,7 @@
 import messageService from '../services/messageService.js';
+import db from '../database/connection.js';
+import conversationService from '../services/conversationService.js';
+import { NotFoundError } from '../middleware/errorHandler.js';
 
 class MessageController {
   async sendMessage(req, res, next) {
@@ -99,6 +102,39 @@ class MessageController {
         success: true,
         data
       });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getAttachment(req, res, next) {
+    try {
+      const attachmentId = parseInt(req.params.id);
+      
+      const attachment = await db.get(
+        `SELECT a.file_data, a.file_type, a.file_name, m.conversation_id 
+         FROM attachments a
+         JOIN messages m ON a.message_id = m.id
+         WHERE a.id = ?`,
+        [attachmentId]
+      );
+      
+      if (!attachment) {
+        throw new NotFoundError('Attachment not found.');
+      }
+      
+      await conversationService.checkMembership(attachment.conversation_id, req.user.id);
+      
+      let data = attachment.file_data;
+      if (typeof data === 'string') {
+        data = Buffer.from(data, 'base64');
+      } else if (!Buffer.isBuffer(data)) {
+        data = Buffer.from(data);
+      }
+      
+      res.setHeader('Content-Type', attachment.file_type);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(attachment.file_name)}"`);
+      res.send(data);
     } catch (err) {
       next(err);
     }
