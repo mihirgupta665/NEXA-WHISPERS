@@ -26,16 +26,19 @@ api.interceptors.response.use(
     const shouldRetry = config && (isNetworkError || isServerError);
 
     if (shouldRetry) {
-      // Initialize retry states
-      config.__retryCount = config.__retryCount || 0;
+      // Ensure headers object exists
+      config.headers = config.headers || {};
+      const retryHeader = config.headers['X-Retry-Count'];
+      const retryCount = retryHeader ? parseInt(retryHeader, 10) : 0;
       const maxRetries = 3;
 
-      if (config.__retryCount < maxRetries) {
-        config.__retryCount += 1;
+      if (retryCount < maxRetries) {
+        const nextRetryCount = retryCount + 1;
+        config.headers['X-Retry-Count'] = nextRetryCount.toString();
         
         // Calculate backoff: 500ms, 1000ms, 2000ms
-        const delayMs = Math.pow(2, config.__retryCount) * 250;
-        console.warn(`[API Client] Request failed: ${error.message}. Retrying request attempt ${config.__retryCount}/${maxRetries} in ${delayMs}ms...`);
+        const delayMs = Math.pow(2, nextRetryCount) * 250;
+        console.warn(`[API Client] Request failed: ${error.message}. Retrying request attempt ${nextRetryCount}/${maxRetries} in ${delayMs}ms...`);
         
         await new Promise(resolve => setTimeout(resolve, delayMs));
         return api(config);
