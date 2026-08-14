@@ -1,0 +1,13 @@
+{
+  "verbose": true,
+  "ignore": [
+    "database/*",
+    "uploads/*",
+    "*.db",
+    "*.db-journal",
+    "*.db-wal",
+    "*.db-shm",
+    "node_modules/*"
+  ],
+  "ext": "js,json"
+}

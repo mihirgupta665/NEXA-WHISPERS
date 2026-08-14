@@ -9,6 +9,14 @@ export async function seedDatabase() {
   await initSchema();
 
   try {
+    // Safety check: Prevent seeding if database already has users, unless forced
+    const force = process.argv.includes('--force');
+    const existingUsers = await db.get('SELECT COUNT(*) as count FROM users');
+    if (existingUsers && existingUsers.count > 0 && !force) {
+      console.log('[Database] Seeding aborted: Users table already contains data. Use "npm run db:seed -- --force" to override and force seeding.');
+      return;
+    }
+
     await db.run('BEGIN TRANSACTION');
 
     // Clean up existing data to ensure idempotent seeding
