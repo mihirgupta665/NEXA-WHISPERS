@@ -46,6 +46,11 @@ export default function ChatArea() {
   const prevMessagesLength = useRef(messages.length);
   const failedFilesRef = useRef(new Map());
 
+  const settingsDropdownRef = useRef(null);
+  const settingsButtonRef = useRef(null);
+  const groupInfoDropdownRef = useRef(null);
+  const groupInfoButtonRef = useRef(null);
+
   // Scroll to bottom helper
   const scrollToBottom = (behavior = 'smooth') => {
     if (messagesEndRef.current) {
@@ -159,6 +164,36 @@ export default function ChatArea() {
     }, 500); // Check every 500ms
     return () => clearInterval(interval);
   }, [activeConversation?.id, activeConversation?.disappearing_timer]);
+
+  // Handle click outside settings/timer or group info dropdowns to close them
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showSettingsDropdown) {
+        if (
+          settingsDropdownRef.current &&
+          !settingsDropdownRef.current.contains(event.target) &&
+          settingsButtonRef.current &&
+          !settingsButtonRef.current.contains(event.target)
+        ) {
+          setShowSettingsDropdown(false);
+        }
+      }
+      if (showGroupInfo) {
+        if (
+          groupInfoDropdownRef.current &&
+          !groupInfoDropdownRef.current.contains(event.target) &&
+          groupInfoButtonRef.current &&
+          !groupInfoButtonRef.current.contains(event.target)
+        ) {
+          setShowGroupInfo(false);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSettingsDropdown, showGroupInfo]);
 
   const handleScrollEvent = () => {
     if (!scrollContainerRef.current) return;
@@ -631,6 +666,7 @@ export default function ChatArea() {
 
           {activeConversation.type === 'group' && (
             <button
+              ref={groupInfoButtonRef}
               onClick={() => {
                 setShowGroupInfo(!showGroupInfo);
                 setShowSettingsDropdown(false);
@@ -645,6 +681,7 @@ export default function ChatArea() {
           )}
 
           <button 
+            ref={settingsButtonRef}
             onClick={() => {
               setShowSettingsDropdown(!showSettingsDropdown);
               setShowGroupInfo(false);
@@ -658,7 +695,7 @@ export default function ChatArea() {
           </button>
           
           {showSettingsDropdown && (
-            <div style={styles.disappearingDropdown} className="anim-scale-up">
+            <div ref={settingsDropdownRef} style={styles.disappearingDropdown} className="anim-scale-up">
               <div style={styles.dropdownHeader}>Disappearing Timer</div>
               {[
                 { label: 'Off', val: 0 },
@@ -686,7 +723,7 @@ export default function ChatArea() {
           )}
 
           {showGroupInfo && activeConversation.type === 'group' && (
-            <div style={styles.infoDropdown} className="anim-scale-up">
+            <div ref={groupInfoDropdownRef} style={styles.infoDropdown} className="anim-scale-up">
               <div style={styles.infoDropdownTitle}>Group Members</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                 {activeConversation.members.map(member => (
