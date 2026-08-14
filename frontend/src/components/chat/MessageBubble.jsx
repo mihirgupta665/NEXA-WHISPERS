@@ -114,11 +114,23 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
 
     const toastId = toast.loading(`Downloading ${fileName}...`);
     try {
-      const response = await api.get(fileUrl, {
-        responseType: 'blob'
+      let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+      if (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.slice(0, -1);
+      }
+      const relativePath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
+      const fullUrl = `${baseUrl}${relativePath}`;
+
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        credentials: 'include' // include session cookie in request
       });
 
-      const blob = response.data;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
 
       const link = document.createElement('a');
