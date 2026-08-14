@@ -1,5 +1,3 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
 import { connect } from '@tursodatabase/serverless';
 import path from 'path';
 import fs from 'fs';
@@ -48,6 +46,10 @@ if (isTurso) {
     }
   };
 } else {
+  const sqlite3Module = await import('sqlite3');
+  const sqlite3 = sqlite3Module.default || sqlite3Module;
+  const { open } = await import('sqlite');
+
   const candidatePaths = [];
 
   if (process.env.DATABASE_PATH) {
