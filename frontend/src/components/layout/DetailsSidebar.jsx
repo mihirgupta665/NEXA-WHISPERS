@@ -12,6 +12,28 @@ export default function DetailsSidebar({ onClose }) {
   const [profileData, setProfileData] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+
+  const formatLastSeen = (lastSeenTime) => {
+    if (!lastSeenTime) return 'Offline';
+    const date = new Date(lastSeenTime);
+    const now = new Date();
+    
+    // Check if within 1 minute
+    const diffMins = Math.floor((now - date) / 60000);
+    if (diffMins < 1) return 'Online';
+    
+    if (date.toDateString() === now.toDateString()) {
+      return `Last seen today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return `Last seen yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    
+    return `Last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  };
   
   // Reporting state
   const [showReportForm, setShowReportForm] = useState(false);
@@ -193,7 +215,7 @@ export default function DetailsSidebar({ onClose }) {
           <span style={styles.profileStatus}>
             {activeConversation.type === 'group'
               ? `${activeConversation.members.length} members`
-              : (otherMember?.is_online === 1 ? 'Online' : 'Offline')}
+              : (otherMember?.is_online === 1 ? 'Online' : formatLastSeen(otherMember?.last_seen || profileData?.user?.last_seen))}
           </span>
         </div>
 
