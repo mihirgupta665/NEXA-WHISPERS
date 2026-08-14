@@ -1,363 +1,235 @@
-# Nexa Whispers
+# Nexa Whispers 💬
 
-A polished, privacy-focused messaging platform inspired by modern secure chat apps.
-
-Nexa Whispers combines a React frontend, an Express + Socket.IO backend, and a persistent SQLite database to deliver real-time messaging, contact management, group chats, and attachment support in a minimal, premium interface.
+Nexa Whispers is a polished, privacy-focused, real-time messaging application. Built with a modern **React SPA (Vite)** frontend, a robust **Node.js/Express REST API**, and a real-time event-driven **Socket.IO** server, it delivers a secure, premium chat experience backed by a persistent **SQLite/Turso** database layer.
 
 ---
 
-## Overview
+## 🏛️ System Architecture
 
-This project is designed to feel like a modern messaging application while staying lightweight and easy to run locally or deploy in production.
+Nexa Whispers uses a client-server architecture split into a high-performance Single Page Application (SPA) frontend and a dual REST/WebSocket backend server.
 
-### Core capabilities
-- Secure user authentication with bcrypt and JWT cookies
-- Real-time conversations via Socket.IO
-- Direct and group chat support
-- Message receipts and typing indicators
-- Attachment support stored in SQLite for persistence
-- Responsive, premium dark UI
-- SQLite-backed data storage suitable for Render deployments
+```mermaid
+graph TD
+    %% Frontend Layer %%
+    subgraph Frontend [Client SPA - React + Vite]
+        ReactApp[React Components]
+        Contexts[Auth & Socket Contexts]
+        SocketClient[Socket.IO Client]
+        AxiosClient[Axios REST Client]
+    end
+
+    %% Network Boundary %%
+    REST_API[HTTP REST Requests]
+    WS_CONN[WebSocket Channel]
+
+    %% Backend Layer %%
+    subgraph Backend [Backend Server - Node.js + Express]
+        Express[Express App]
+        Routes[API Routes / Middleware]
+        Controllers[API Controllers]
+        SocketServer[Socket.IO Server]
+        AuthMD[JWT Auth Middleware]
+    end
+
+    %% Data Layer %%
+    subgraph Database [Persistence Layer - SQLite / Turso]
+        DBConnection[sqlite3 / connection.js]
+        DBSchema[Database Tables]
+    end
+
+    %% Connections %%
+    ReactApp --> Contexts
+    Contexts --> AxiosClient
+    Contexts --> SocketClient
+
+    AxiosClient -.->|JSON API| REST_API
+    SocketClient -.->|Real-time events| WS_CONN
+
+    REST_API --> Express
+    WS_CONN --> SocketServer
+
+    Express --> Routes
+    Routes --> AuthMD
+    AuthMD --> Controllers
+    Controllers --> DBConnection
+    SocketServer --> DBConnection
+
+    DBConnection --> DBSchema
+```
 
 ---
 
-## Tech stack
+## ✨ Core Capabilities
 
-### Frontend
-- React + Vite
-- React Router
-- Axios for API access
-- Socket.IO client for realtime communication
-- Custom CSS-based design system
+### ⚡ Real-Time Instant Messaging
+- **Real-Time Communication**: Multi-client chat propagation backed by Socket.IO.
+- **Receipt Syncing**: Instant `sent` ➜ `delivered` ➜ `read` status syncs across sender and receiver windows.
+- **Typing Indicators**: Visual indicators dynamically reflecting typing statuses of users.
+- **Disappearing Messages**: End-to-end simulated messaging timers (e.g. 5s, 1m, 1d) that perform lazy-cleanups of expired conversations inside SQLite.
 
-### Backend
-- Node.js + Express
-- Socket.IO server
-- SQLite database with sqlite3 + sqlite
-- JWT cookie auth
-- multer for file upload handling
+### 👥 Interactive Profiles & Sidebars
+- **Details Sidebar**: Click on any chat header to slide open an elegant sidebar displaying contact statuses, username metadata, mutual groups, phone numbers, and actions.
+- **Mutual Groups**: Displays shared group spaces in common. Click to navigate directly to the shared conversation.
+- **Real blocking**: Block users instantly in direct chats. Blocking halts messaging immediately, rendering error warnings in inputs.
+- **Simulation Reports**: Simulates reporting contacts for administrative review.
 
-### Database
-- SQLite persistence at `backend/database/database.db`
-- Production-safe fallback path handling for Render
+### 🛡️ Group Administration
+- **Sleek Admin Controls**: Group creators/admins can add new members by searching through added contacts, or remove members from the group space dynamically.
+- **Live Membership Sync**: Addition or removal of members is broadcasted instantly via WebSocket to redraw group components.
+
+### ⚙️ User Privacy & Profile Management
+- **Personalized About Section**: Configure and edit your bio from the Settings modal, which is persisted globally and viewable to your chat contacts.
 
 ---
 
-## Project structure
+## 🛠️ Technology Stack
+
+| Layer | Technologies | Key Capabilities |
+| :--- | :--- | :--- |
+| **Frontend** | React 19, Vite, React Router 7 | Responsive SPA rendering, light/dark mode theme triggers, context-driven state management |
+| **Realtime** | Socket.IO Client & Server | Bi-directional client-server state events, typing indicator tracking, instant receipt broadcasts |
+| **Backend** | Node.js, Express, JWT, BcryptJS | REST API routing, secure HttpOnly cookie session auth, schema validator middlewares |
+| **Database** | SQLite, SQLite3, sqlite (driver) | Relational SQL persistence, schema migrations, binary BLOB storage for document attachments |
+| **Styling** | Vanilla CSS Grid & Flexbox | Modern typography (Inter, Outfit), high-performance animation tokens, glassmorphism UI |
+
+---
+
+## 📂 Project Structure
 
 ```text
 NEXA-WHISPERS/
 ├── backend/
 │   ├── database/
-│   │   └── database.db
+│   │   └── database.db          # Persistent SQLite database file
 │   ├── src/
-│   │   ├── controllers/
-│   │   ├── database/
-│   │   ├── middleware/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── sockets/
-│   │   ├── validators/
-│   │   ├── app.js
-│   │   └── ...
-│   ├── .env.example
+│   │   ├── controllers/         # Handles route responses & business validation
+│   │   ├── database/            # Schema tables initialization and seeder code
+│   │   ├── middleware/          # JWT check cookies, error handling wrappers
+│   │   ├── routes/              # Express API route registrations
+│   │   ├── services/            # Database transactions & services
+│   │   ├── sockets/             # Real-time WebSocket event configurations
+│   │   └── app.js               # Express application initialization
 │   ├── package.json
-│   ├── postinstall.js
-│   └── server.js
+│   └── server.js                # Core entry point starting REST and WS servers
 ├── frontend/
 │   ├── src/
-│   ├── public/
-│   ├── .env.example
+│   │   ├── assets/              # Static SVG images and styles
+│   │   ├── components/          # Reusable layouts, modals, and composition tools
+│   │   ├── context/             # Global React hooks (Auth, Conversations, Sockets)
+│   │   ├── pages/               # Main view ports (Login, Register, Chat workspace)
+│   │   └── main.jsx             # React client entry point
 │   ├── package.json
-│   ├── vite.config.js
-│   └── vercel.json
-├── README.md
+│   └── vite.config.js
 └── package.json
 ```
 
 ---
 
-## Features
+## 📡 API and WebSocket Documentation
 
-### Messaging
-- Direct chats and group conversations
-- Message replies and conversation context
-- Reactions and typing indicators
-- Delivery and read status tracking
-- Real-time update propagation across clients
+### REST API Endpoints
 
-### User experience
-- Minimal premium interface
-- Dark mode styling
-- Searchable conversations and contacts
-- Responsive layout for desktop use
+#### Authentication
+- `POST /api/auth/register` - Create new user profile.
+- `POST /api/auth/verify-otp` - Verify 6-digit verification code (`123456` in development).
+- `POST /api/auth/login` - Initiate user sign-in session.
+- `POST /api/auth/logout` - Clear JWT authentication cookie.
+- `GET /api/auth/me` - Retrieve active user session metadata.
 
-### Data persistence
-- User data, conversations, messages, reactions, and attachments are stored in SQLite
-- Attachment content is saved in the database instead of ephemeral filesystem storage
-- This avoids data loss on Render rebuilds and restarts
+#### User Profile
+- `GET /api/users/profile/:id?` - Fetch profile metadata, including bio status (`about`), mutual groups, and blocking relations.
+- `PUT /api/users/profile` - Update display name, avatar, username, and bio status.
+- `POST /api/users/block` - Block contact messaging.
+- `POST /api/users/unblock` - Remove contact block.
+- `POST /api/users/report` - Submit Simulation Abuse Report.
+
+#### Conversations & Messaging
+- `GET /api/conversations` - Fetch list of active direct and group chats.
+- `POST /api/conversations/direct` - Retrieve or establish a direct 1-to-1 chat space.
+- `POST /api/conversations/group` - Establish a new group space with specified member list.
+- `GET /api/conversations/:id/messages` - Retrieve chat message history.
+- `POST /api/conversations/:id/messages` - Send a text message or file attachment.
+- `POST /api/conversations/:id/members` - Add contact to group (Admin only).
+- `DELETE /api/conversations/:id/members/:userId` - Remove member from group (Admin only).
 
 ---
 
-## Local development setup
+### Real-Time WebSocket Event Specs
+
+| Event | Direction | Payload | Description |
+| :--- | :--- | :--- | :--- |
+| `message:new` | Server ➜ Client | `Message` | Broadcasts new message text/attachment to conversation members |
+| `message:status` | Both | `{ messageId, status }` | Propagates message status changes (`sent` ➜ `delivered` ➜ `read`) |
+| `typing:start` | Both | `{ conversationId, username }` | Triggers "Typing..." notification in client headers |
+| `typing:stop` | Both | `{ conversationId, userId }` | Clears active typing text from recipient client header |
+| `group:member-added` | Server ➜ Client | `{ conversation, targetUserId }` | Propagates new group members to update UI lists |
+| `group:member-removed` | Server ➜ Client | `{ conversationId, targetUserId }` | Triggers conversation exit or members list updates |
+| `user:online` | Server ➜ Client | `{ userId }` | Broadcasts user connection presence status |
+| `user:offline` | Server ➜ Client | `{ userId, last_seen }` | Broadcasts user disconnection and last seen timestamp |
+
+---
+
+## 🚀 Installation & Local Execution
 
 ### Prerequisites
-- Node.js 18+
-- npm
+- **Node.js** v18 or newer
+- **npm** package manager
 
-### 1) Install backend dependencies
-
+### 1. Launch the Backend Server
 ```bash
+# Navigate to the backend directory
 cd backend
+
+# Install dependencies
 npm install
-```
 
-### 2) Configure backend environment
-
-Copy the example file and update values if needed:
-
-```bash
+# Set up configuration variables
 cp .env.example .env
-```
 
-Example:
+# Initialize database schema tables
+npm run db:init
 
-```env
-PORT=5000
-JWT_SECRET=nexa_whispers_development_secret_key_13579
-CLIENT_URL=http://localhost:5173
-DATABASE_PATH=database/database.db
-NODE_ENV=development
-```
+# Seed database with dummy developer data profiles
+npm run db:seed
 
-### 3) Start the backend
-
-```bash
+# Start node development watcher
 npm run dev
 ```
+*Note: The API server runs at `http://localhost:5001`.*
 
-The backend runs on:
-
+### 2. Launch the Frontend React Client
 ```bash
-http://localhost:5000
-```
-
-### 4) Install frontend dependencies
-
-```bash
+# Navigate to the frontend directory
 cd ../frontend
+
+# Install dependencies
 npm install
-```
 
-### 5) Configure frontend environment
-
-```bash
-cp .env.example .env
-```
-
-Example:
-
-```env
-VITE_API_URL=http://localhost:5000
-VITE_SOCKET_URL=http://localhost:5000
-```
-
-### 6) Start the frontend
-
-```bash
+# Start Vite SPA hot reloader
 npm run dev
 ```
-
-The frontend runs on:
-
-```bash
-http://localhost:5173
-```
+*Note: Open `http://localhost:5173/` in your browser to access the application.*
 
 ---
 
-## Production deployment
+## 👥 Demo Profiles
 
-### Backend on Render
-Set the following environment variables in Render:
+Use the seeded profiles below to test real-time features across multiple browser profiles (e.g. Standard Chrome Window and Incognito window):
 
-```env
-PORT=10000
-JWT_SECRET=your_secure_secret
-CLIENT_URL=https://your-vercel-app.vercel.app
-DATABASE_PATH=/opt/render/project/src/backend/database/database.db
-NODE_ENV=production
-```
-
-Notes:
-- Use a writable path, not `/database`
-- SQLite data persists in the project folder on Render when the path is valid
-
-### Frontend on Vercel
-Set these variables in Vercel:
-
-```env
-VITE_API_URL=https://your-render-backend.onrender.com
-VITE_SOCKET_URL=https://your-render-backend.onrender.com
-```
-
-Then deploy the `frontend` directory as a Vite app with:
-- Build command: `npm run build`
-- Output directory: `dist`
+* **Available Users**: `mihir`, `rahul`, `ananya`, `arjun`, `priya`, `neha`
+* **Default Password**: `password123`
+* **Local Developer OTP**: `123456`
 
 ---
 
-## API overview
+## 🗄️ Database Production Persistence (Render)
 
-### Authentication
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
+SQLite databases are stored as local files. When deploying to container-based hosts like Render, any write operations inside the container are lost during redeployments. 
 
-### Users
-- `GET /api/users/profile`
-- `PUT /api/users/profile`
-
-### Contacts
-- `GET /api/contacts`
-- `POST /api/contacts`
-- `DELETE /api/contacts/:id`
-
-### Conversations
-- `GET /api/conversations`
-- `POST /api/conversations/direct`
-- `POST /api/conversations/group`
-- `GET /api/conversations/:id/messages`
-- `POST /api/conversations/:id/messages`
-
-### Messages
-- `POST /api/messages/:id/reactions`
-- `DELETE /api/messages/:id/reactions`
-- `GET /api/messages/search`
-
----
-
-## Real-time events
-
-### Client to server
-- `typing:start`
-- `typing:stop`
-- `message:delivered`
-- `message:read`
-
-### Server to client
-- `message:new`
-- `message:status`
-- `conversation:created`
-- `user:online`
-- `user:offline`
-
----
-
-## Notes
-
-This project uses SQLite as the database layer for simplicity, cross-platform compatibility, and persistence without requiring a managed database service. The app is intentionally designed to be easy to understand, extend, and deploy while preserving the core messaging experience.
-
----
-
-## License
-
-This project is intended for educational and portfolio use.
-
-
-
-### 1. Backend Server Configuration
-1. Navigate to the backend folder:
-   ```bash
-   cd backend
+To achieve persistent data storage in production:
+1. Set up a **Persistent Disk** on Render (e.g., Mount Path `/var/data`).
+2. Add the following environment variable to the Render Web Service configuration:
+   ```env
+   DATABASE_PATH=/var/data/database.db
    ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Copy environment configuration:
-   ```bash
-   cp .env.example .env
-   ```
-4. Run schema initialization:
-   ```bash
-   npm run db:init
-   ```
-5. Seed database with realistic demo accounts:
-   ```bash
-   npm run db:seed
-   ```
-6. Start development server on port 5000:
-   ```bash
-   npm run dev
-   ```
-
-### 2. Frontend SPA Configuration
-1. Open a new terminal and navigate to the frontend folder:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start Vite development server:
-   ```bash
-   npm run dev
-   ```
-4. Open the displayed URL (normally `http://localhost:5173`) in your browser.
-
----
-
-## Demo Credentials
-
-The database contains pre-configured profiles so the interface is populated immediately:
-
-* **Users list**: `mihir`, `rahul`, `ananya`, `arjun`, `priya`, `neha`
-* **Default password**: `password123`
-* **OTP developer code**: `123456`
-
-To simulate real-time conversations locally, open two different browser profiles (e.g. Chrome guest window and Incognito window):
-1. Log in on window A as **mihir** / `password123`.
-2. Log in on window B as **rahul** / `password123`.
-3. Open the "Core Team" group chat or "Rahul" chat on window A and send messages, verifying status receipts and typing dots synchronization.
-
----
-
-## SQLite Production Deployment Configuration
-
-SQLite is a file-based local database. To prevent database erasure upon container rebuilds in production environments:
-* **Backend deployment (Render)**: Attach a persistent disk to the Render web service, mounted to `/var/data`. Set `DATABASE_PATH=/var/data/database.db` in Render environment variables. This ensures the database file persists across service restarts and builds.
-
----
-
-## Troubleshooting
-
-### Port 5001 already in use (Hanging Node Process)
-If the application fails to start or remains stuck on the loading screen ("Syncing channels..."), a dangling/hanging `node` process might be occupying port `5001`.
-
-To fix this:
-1. Identify the process ID (PID) using port 5001:
-   * **PowerShell:**
-     ```powershell
-     Get-Process -Id (Get-NetTCPConnection -LocalPort 5001).OwningProcess
-     ```
-   * **CMD:**
-     ```cmd
-     netstat -ano | findstr :5001
-     ```
-2. Kill the hanging process:
-   * **PowerShell:**
-     ```powershell
-     Stop-Process -Id <PID> -Force
-     ```
-   * **CMD:**
-     ```cmd
-     taskkill /PID <PID> /F
-     ```
-3. Restart the dev environment:
-   ```bash
-   npm run dev
-   ```
-
+This redirects connection streams to the persistent disk path, maintaining active chat data safely across node upgrades and service builds.
