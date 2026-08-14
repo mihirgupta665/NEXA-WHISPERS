@@ -338,7 +338,7 @@ export default function DetailsSidebar({ onClose }) {
           <div style={styles.sectionContainer}>
             <div style={styles.groupMetaInfo}>
               <Info size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-              <span>Created by group admin. Admin privileges allow adding or removing members.</span>
+              <span>Created by {activeConversation.creator_name || 'group admin'}. Admin privileges allow adding or removing members.</span>
             </div>
 
             {/* Admin add members panel */}

@@ -6,11 +6,13 @@ class ConversationService {
     // 1. Get all conversations user belongs to
     const conversations = await db.all(
       `SELECT c.id, c.type, c.name, c.avatar_url, c.created_by, c.disappearing_timer, c.disappearing_timer_started_at, c.pinned_message_id, c.created_at, c.updated_at,
-              m_pin.content as pinned_message_content, m_pin.message_type as pinned_message_type, u_pin.display_name as pinned_message_sender_name
+              m_pin.content as pinned_message_content, m_pin.message_type as pinned_message_type, u_pin.display_name as pinned_message_sender_name,
+              u_creator.display_name as creator_name
        FROM conversations c
        JOIN conversation_members cm ON c.id = cm.conversation_id
        LEFT JOIN messages m_pin ON c.pinned_message_id = m_pin.id
        LEFT JOIN users u_pin ON m_pin.sender_id = u_pin.id
+       LEFT JOIN users u_creator ON c.created_by = u_creator.id
        WHERE cm.user_id = ?
        ORDER BY c.updated_at DESC`,
       [userId]
@@ -136,10 +138,12 @@ class ConversationService {
 
   async getConversationById(conversationId, userId) {
     const conv = await db.get(
-      `SELECT c.*, m_pin.content as pinned_message_content, m_pin.message_type as pinned_message_type, u_pin.display_name as pinned_message_sender_name
+      `SELECT c.*, m_pin.content as pinned_message_content, m_pin.message_type as pinned_message_type, u_pin.display_name as pinned_message_sender_name,
+              u_creator.display_name as creator_name
        FROM conversations c
        LEFT JOIN messages m_pin ON c.pinned_message_id = m_pin.id
        LEFT JOIN users u_pin ON m_pin.sender_id = u_pin.id
+       LEFT JOIN users u_creator ON c.created_by = u_creator.id
        WHERE c.id = ?`,
       [conversationId]
     );
