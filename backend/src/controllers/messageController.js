@@ -163,6 +163,28 @@ class MessageController {
     }
   }
 
+  async deleteMessage(req, res, next) {
+    try {
+      const messageId = parseInt(req.params.id);
+      const result = await messageService.deleteMessage(messageId, req.user.id);
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`conversation_${result.conversationId}`).emit('message:delete', {
+          messageId: result.messageId,
+          conversationId: result.conversationId
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Message deleted successfully.'
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async searchMessages(req, res, next) {
     try {
       const queryStr = req.query.q || '';

@@ -174,6 +174,22 @@ export function ConversationProvider({ children }) {
       );
     });
 
+    // Listen for deleted messages
+    socket.on('message:delete', ({ messageId, conversationId }) => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id === conversationId && c.latest_message && c.latest_message.id === messageId) {
+            return {
+              ...c,
+              latest_message: null
+            };
+          }
+          return c;
+        })
+      );
+    });
+
     // Listen for read receipt syncs
     socket.on('message:read_sync', ({ conversationId, userId, messageIds }) => {
       if (activeConversationRef.current && activeConversationRef.current.id === conversationId) {

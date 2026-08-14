@@ -405,6 +405,57 @@ class MessageService {
 
     return messages;
   }
+
+  async deleteMessage(messageId, userId) {
+    const msg = await db.get(
+      `SELECT m.id, m.sender_id, m.conversation_id, a.file_data 
+       FROM messages m
+       LEFT JOIN attachments a ON m.id = a.message_id
+       WHERE m.id = ?`,
+      [messageId]
+    );
+
+    if (!msg) {
+      throw new Error('Message not found.');
+    }
+
+    if (msg.sender_id !== userId) {
+      throw new Error('Unauthorized to delete this message.');
+    }
+
+    // Optional: Delete from Cloudinary if it's stored there
+    if (msg.file_data && typeof msg.file_data === 'string' && msg.file_data.startsWith('http')) {
+      try {
+        const urlParts = msg.file_data.split('/');
+        const uploadIndex = urlParts.indexOf('upload');
+        if (uploadIndex !== -1 && uploadIndex < urlParts.length - 2) {
+          const publicIdWithExt = urlParts[urlParts.length - 1];
+          const publicId = publicIdWithExt.split('.').slice(0, -1).join('.');
+          console.log(`[Cloudinary] Deleting file during message deletion: ${publicId}`);
+          
+          const { v2: cloudinary } = await import('cloudinary');
+          if (process.env.CLOUDINARY_CLOUD_NAME) {
+            cloudinary.config({
+              cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+              api_key: process.env.CLOUDINARY_API_KEY,
+              api_secret: process.env.CLOUDINARY_API_SECRET
+            });
+            await cloudinary.uploader.destroy(publicId);
+            console.log('[Cloudinary] File deleted successfully.');
+          }
+        }
+      } catch (cloudinaryErr) {
+        console.error('[Cloudinary] Failed to delete file during message deletion:', cloudinaryErr);
+      }
+    }
+
+    await db.run('DELETE FROM messages WHERE id = ?', [messageId]);
+
+    return {
+      messageId,
+      conversationId: msg.conversation_id
+    };
+  }
 }
 
 export default new MessageService();

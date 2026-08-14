@@ -325,8 +325,16 @@ export default function ChatArea() {
   };
 
   const handleDelete = async (messageId) => {
-    // Coming soon placeholder dialog or delete
-    toast.info('Message deletion is simulation placeholder. Coming Soon!');
+    try {
+      const res = await api.delete(`/api/messages/${messageId}`);
+      if (res.data.success) {
+        toast.success('Message deleted');
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      }
+    } catch (err) {
+      console.error('[Delete Error] Failed to delete message:', err);
+      toast.error('Failed to delete message.');
+    }
   };
 
   const handleSelectDisappearingTimer = async (seconds) => {
