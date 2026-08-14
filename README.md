@@ -329,3 +329,35 @@ To simulate real-time conversations locally, open two different browser profiles
 
 SQLite is a file-based local database. To prevent database erasure upon container rebuilds in production environments:
 * **Backend deployment (Render)**: Attach a persistent disk to the Render web service, mounted to `/var/data`. Set `DATABASE_PATH=/var/data/database.db` in Render environment variables. This ensures the database file persists across service restarts and builds.
+
+---
+
+## Troubleshooting
+
+### Port 5001 already in use (Hanging Node Process)
+If the application fails to start or remains stuck on the loading screen ("Syncing channels..."), a dangling/hanging `node` process might be occupying port `5001`.
+
+To fix this:
+1. Identify the process ID (PID) using port 5001:
+   * **PowerShell:**
+     ```powershell
+     Get-Process -Id (Get-NetTCPConnection -LocalPort 5001).OwningProcess
+     ```
+   * **CMD:**
+     ```cmd
+     netstat -ano | findstr :5001
+     ```
+2. Kill the hanging process:
+   * **PowerShell:**
+     ```powershell
+     Stop-Process -Id <PID> -Force
+     ```
+   * **CMD:**
+     ```cmd
+     taskkill /PID <PID> /F
+     ```
+3. Restart the dev environment:
+   ```bash
+   npm run dev
+   ```
+
