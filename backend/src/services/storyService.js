@@ -18,8 +18,7 @@ class StoryService {
           { user_id: 1, content: 'Chilling out at the dev desk 🚀', gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
           { user_id: 2, content: 'Vibe check! Signal aesthetics are amazing.', gradient: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)' },
           { user_id: 3, content: 'Beautiful day outside today! ☀️', gradient: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)' },
-          { user_id: 4, content: 'Coding all night, sleeping all day.', gradient: 'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)' },
-          { user_id: 5, content: 'Just baked some fresh chocolate chip cookies!', gradient: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)' }
+          { user_id: 4, content: 'Coding all night, sleeping all day.', gradient: 'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)' }
         ];
 
         await db.run('BEGIN TRANSACTION');

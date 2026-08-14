@@ -32,13 +32,12 @@ export async function seedDatabase() {
     const now = Date.now();
     const passwordHash = bcrypt.hashSync('password123', 10);
 
-    // 1. Insert Users
+     // 1. Insert Users
     const users = [
       { id: 1, username: 'mihir', phone: '+919999999999', display_name: 'Mihir', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Mihir' },
       { id: 2, username: 'rahul', phone: '+918888888888', display_name: 'Rahul', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Rahul' },
       { id: 3, username: 'ananya', phone: '+917777777777', display_name: 'Ananya', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Ananya' },
       { id: 4, username: 'arjun', phone: '+916666666666', display_name: 'Arjun', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Arjun' },
-      { id: 5, username: 'priya', phone: '+915555555555', display_name: 'Priya', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Priya' },
       { id: 6, username: 'neha', phone: '+914444444444', display_name: 'Neha', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Neha' },
       { id: 7, username: '+919876543210', phone: '+919876543210', display_name: '+919876543210', avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=%2B919876543210' }
     ];
@@ -52,13 +51,14 @@ export async function seedDatabase() {
     }
 
     // 2. Insert Contacts
-    // Mihir <=> all
+    // Mihir <=> all (skip 5)
     for (let targetId = 2; targetId <= 7; targetId++) {
+      if (targetId === 5) continue;
       await db.run(`INSERT INTO contacts (user_id, contact_user_id, created_at) VALUES (?, ?, ?)`, [1, targetId, now]);
       await db.run(`INSERT INTO contacts (user_id, contact_user_id, created_at) VALUES (?, ?, ?)`, [targetId, 1, now]);
     }
-    // Rahul <=> Ananya, Arjun, Priya
-    for (let targetId = 3; targetId <= 5; targetId++) {
+    // Rahul <=> Ananya, Arjun
+    for (let targetId = 3; targetId <= 4; targetId++) {
       await db.run(`INSERT INTO contacts (user_id, contact_user_id, created_at) VALUES (?, ?, ?)`, [2, targetId, now]);
       await db.run(`INSERT INTO contacts (user_id, contact_user_id, created_at) VALUES (?, ?, ?)`, [targetId, 2, now]);
     }
