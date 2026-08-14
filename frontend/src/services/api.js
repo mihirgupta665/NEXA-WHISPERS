@@ -30,13 +30,13 @@ api.interceptors.response.use(
       config.headers = config.headers || {};
       const retryHeader = config.headers['X-Retry-Count'];
       const retryCount = retryHeader ? parseInt(retryHeader, 10) : 0;
-      const maxRetries = 3;
+      const maxRetries = 5;
 
       if (retryCount < maxRetries) {
         const nextRetryCount = retryCount + 1;
         config.headers['X-Retry-Count'] = nextRetryCount.toString();
         
-        // Calculate backoff: 500ms, 1000ms, 2000ms
+        // Calculate backoff: 500ms, 1000ms, 2000ms, 4000ms, 8000ms
         const delayMs = Math.pow(2, nextRetryCount) * 250;
         console.warn(`[API Client] Request failed: ${error.message}. Retrying request attempt ${nextRetryCount}/${maxRetries} in ${delayMs}ms...`);
         
