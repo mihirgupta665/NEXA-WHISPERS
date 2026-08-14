@@ -48,6 +48,16 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/stories', storyRoutes);
 
+// Health check and root endpoints for Render/deployment checking
+app.get(['/', '/health'], (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'ok',
+    message: 'Nexa Whispers API is running and healthy.',
+    timestamp: Date.now()
+  });
+});
+
 // Fallback 404 handler
 app.use((req, res, next) => {
   next(new NotFoundError(`Requested resource was not found: ${req.method} ${req.url}`));
