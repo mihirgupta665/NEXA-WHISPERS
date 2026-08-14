@@ -730,6 +730,12 @@ export default function ChatArea() {
         ref={scrollContainerRef}
         onScroll={handleScrollEvent}
         style={styles.messagesPane}
+        onClick={(e) => {
+          const clickedCard = e.target.closest('.msg-bubble-card') || e.target.closest('.premium-context-menu');
+          if (!clickedCard && activeReply) {
+            setActiveReply(null);
+          }
+        }}
       >
         <div style={styles.e2eBanner}>
           <ShieldAlert size={14} color="var(--primary)" />

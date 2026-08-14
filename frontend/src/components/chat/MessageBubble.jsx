@@ -89,6 +89,22 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
     setIsActionMenuOpen(false);
   };
 
+  const handleDownload = () => {
+    if (!message.attachment) return;
+    const attachmentUrl = message.attachment.file_url?.startsWith('data:')
+      ? message.attachment.file_url
+      : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${message.attachment.file_url}`;
+      
+    const link = document.createElement('a');
+    link.href = attachmentUrl;
+    link.download = message.attachment.file_name;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsActionMenuOpen(false);
+  };
+
   const formatMessageTime = (timestamp) => {
     if (!timestamp) return '';
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -333,6 +349,11 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
                 <button className="premium-context-menu-item" onClick={() => { onReplyClick(message); setIsActionMenuOpen(false); }}>
                   <CornerUpLeft size={14} /> Reply
                 </button>
+                {message.message_type === 'attachment' && message.attachment && (
+                  <button className="premium-context-menu-item" onClick={handleDownload}>
+                    <Download size={14} /> Download File
+                  </button>
+                )}
                 <button className="premium-context-menu-item" onClick={handleCopyText}>
                   <Copy size={14} /> Copy Text
                 </button>
