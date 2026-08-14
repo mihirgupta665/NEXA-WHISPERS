@@ -66,9 +66,10 @@ class AuthController {
 
   async me(req, res, next) {
     try {
+      const token = req.cookies?.token || (req.headers.authorization && req.headers.authorization.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
       res.status(200).json({
         success: true,
-        data: { user: req.user }
+        data: { user: req.user, token }
       });
     } catch (err) {
       next(err);

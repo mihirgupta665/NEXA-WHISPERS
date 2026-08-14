@@ -11,6 +11,11 @@ export default async function authMiddleware(req, res, next) {
       token = req.headers.authorization.split(' ')[1];
     }
 
+    // Fallback check in query string for direct downloads
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
+
     if (!token) {
       throw new UnauthorizedError('Authentication token is missing. Please log in.');
     }

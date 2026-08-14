@@ -12,11 +12,16 @@ export function AuthProvider({ children }) {
       const res = await api.get('/api/auth/me');
       if (res.data.success) {
         setUser(res.data.data.user);
+        if (res.data.data.token) {
+          localStorage.setItem('token', res.data.data.token);
+        }
       } else {
         setUser(null);
+        localStorage.removeItem('token');
       }
     } catch (err) {
       setUser(null);
+      localStorage.removeItem('token');
     } finally {
       setLoading(false);
     }
@@ -40,6 +45,9 @@ export function AuthProvider({ children }) {
     const res = await api.post('/api/auth/verify-otp', { phone, code });
     if (res.data.success) {
       setUser(res.data.data.user);
+      if (res.data.data.token) {
+        localStorage.setItem('token', res.data.data.token);
+      }
     }
     return res.data;
   };
@@ -56,6 +64,7 @@ export function AuthProvider({ children }) {
       console.error('[Auth Context] Logout API call failed:', err);
     } finally {
       setUser(null);
+      localStorage.removeItem('token');
     }
   };
 

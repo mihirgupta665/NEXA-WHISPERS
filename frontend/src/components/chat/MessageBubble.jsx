@@ -90,7 +90,7 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
     setIsActionMenuOpen(false);
   };
 
-  const handleDownload = async (e) => {
+  const handleDownload = (e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -112,50 +112,32 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
       return;
     }
 
-    const toastId = toast.loading(`Downloading ${fileName}...`);
     try {
       let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
       if (baseUrl.endsWith('/')) {
         baseUrl = baseUrl.slice(0, -1);
       }
       const relativePath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
-      const fullUrl = `${baseUrl}${relativePath}`;
+      
+      const token = localStorage.getItem('token');
+      const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
+      const fullUrl = `${baseUrl}${relativePath}${tokenQuery}`;
 
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        credentials: 'include' // include session cookie in request
-      });
+      // Create a hidden iframe to trigger direct streaming download
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = fullUrl;
+      document.body.appendChild(iframe);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // Clean up the iframe after 10 seconds
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 10000);
 
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-
-      toast.update(toastId, {
-        render: 'Download complete!',
-        type: 'success',
-        isLoading: false,
-        autoClose: 2000
-      });
+      toast.success(`Downloading ${fileName}...`, { autoClose: 2000 });
     } catch (err) {
-      console.error('[Download Error] Failed to download attachment:', err);
-      toast.update(toastId, {
-        render: 'Failed to download file.',
-        type: 'error',
-        isLoading: false,
-        autoClose: 3000
-      });
+      console.error('[Download Error] Failed to trigger download:', err);
+      toast.error('Failed to start download.');
     }
     setIsActionMenuOpen(false);
   };
