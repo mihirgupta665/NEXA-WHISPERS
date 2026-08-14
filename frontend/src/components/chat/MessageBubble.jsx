@@ -108,7 +108,7 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
       case 'delivered':
         return <CheckCheck size={14} color="var(--text-muted)" style={styles.tickIcon} />;
       case 'read':
-        return <CheckCheck size={14} color="var(--primary)" style={styles.tickIcon} />; // Purple double check
+        return <CheckCheck size={14} color="#34b7f1" style={styles.tickIcon} />; // Professional blue double check (WhatsApp style)
       default:
         return null;
     }
