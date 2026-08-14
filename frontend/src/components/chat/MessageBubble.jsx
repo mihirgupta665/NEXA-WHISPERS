@@ -113,26 +113,28 @@ export default function MessageBubble({ message, messagesList, onReplyClick, onR
     }
 
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.warn('Session syncing. Please refresh the page once and try downloading again.');
+        setIsActionMenuOpen(false);
+        return;
+      }
+
       let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
       if (baseUrl.endsWith('/')) {
         baseUrl = baseUrl.slice(0, -1);
       }
       const relativePath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
-      
-      const token = localStorage.getItem('token');
-      const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
+      const tokenQuery = `?token=${encodeURIComponent(token)}`;
       const fullUrl = `${baseUrl}${relativePath}${tokenQuery}`;
 
-      // Create a hidden iframe to trigger direct streaming download
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = fullUrl;
-      document.body.appendChild(iframe);
-
-      // Clean up the iframe after 10 seconds
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 10000);
+      // Open in a new tab/window to trigger direct native browser streaming download
+      const link = document.createElement('a');
+      link.href = fullUrl;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
       toast.success(`Downloading ${fileName}...`, { autoClose: 2000 });
     } catch (err) {
